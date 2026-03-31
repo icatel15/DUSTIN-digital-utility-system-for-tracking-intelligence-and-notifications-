@@ -160,7 +160,7 @@ export class AgentRuntime {
 			});
 
 			for await (const message of queryStream) {
-				switch (message.type) {
+					switch (message.type) {
 					case "system": {
 						if (message.subtype === "init") {
 							sdkSessionId = message.session_id;

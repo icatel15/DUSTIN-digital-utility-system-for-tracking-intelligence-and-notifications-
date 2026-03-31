@@ -466,8 +466,9 @@ async function main(): Promise<void> {
 			}
 		} else {
 			// All other channels: send via router
+			const responseText = response.text?.trim() || "(No response generated)";
 			await router.send(msg.channelId, msg.conversationId, {
-				text: response.text,
+				text: responseText,
 				threadId: msg.threadId,
 			});
 		}

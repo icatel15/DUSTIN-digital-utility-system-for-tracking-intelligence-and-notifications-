@@ -91,7 +91,17 @@ export class TelegramChannel implements Channel {
 			this.bot = new Telegraf(this.config.botToken) as unknown as TelegrafBot;
 
 			this.registerHandlers();
-			await this.bot.launch();
+
+			// launch() starts an infinite polling loop — it never resolves.
+			// Fire and forget, then mark connected once polling is running.
+			this.bot.launch({ dropPendingUpdates: true }).catch((err: unknown) => {
+				const msg = err instanceof Error ? err.message : String(err);
+				console.error(`[telegram] Polling error: ${msg}`);
+				this.connectionState = "error";
+			});
+
+			// Give Telegraf a moment to start polling, then mark connected
+			await new Promise((r) => setTimeout(r, 500));
 			this.connectionState = "connected";
 			console.log("[telegram] Bot connected via long polling");
 		} catch (err: unknown) {
@@ -126,11 +136,18 @@ export class TelegramChannel implements Channel {
 		if (!this.bot) throw new Error("Telegram bot not connected");
 
 		const chatId = parseTelegramConversationId(conversationId);
-		const text = escapeMarkdownV2(message.text);
 
-		const result = await this.bot.telegram.sendMessage(chatId, text, {
-			parse_mode: "MarkdownV2",
-		});
+		let result: { message_id: number };
+		try {
+			const escaped = escapeMarkdownV2(message.text);
+			if (!escaped.trim()) throw new Error("Empty after escaping");
+			result = await this.bot.telegram.sendMessage(chatId, escaped, {
+				parse_mode: "MarkdownV2",
+			});
+		} catch {
+			// Fallback: send as plain text if MarkdownV2 escaping fails
+			result = await this.bot.telegram.sendMessage(chatId, message.text);
+		}
 
 		return {
 			id: String(result.message_id),
