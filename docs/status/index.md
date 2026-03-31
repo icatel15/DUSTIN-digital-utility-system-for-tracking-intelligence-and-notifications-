@@ -40,19 +40,18 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 ## Outstanding Work
 
 - [ ] Add Tash's Telegram user ID for partner access
-- [ ] Custom domain + Caddy HTTPS (required for production — port now localhost-only)
+- [ ] Custom domain + Caddy HTTPS
 - [ ] Notion integration (Phase 3)
 - [ ] Email via Resend (Phase 4)
 - [ ] Web admin dashboard (Phase 5)
 - [ ] Remove debug logging artifacts from production code
 - [ ] Rotate API keys exposed during setup (Anthropic, OpenAI, Qdrant, Telegram bot token)
 - [ ] Set `TRIGGER_SECRET` env var on VPS for /trigger endpoint access
-- [ ] Deploy with `docker-compose.prod.yaml` override for localhost port binding
 
 ## Next Steps
 
-1. Deploy security hardening (set TRIGGER_SECRET, use docker-compose.prod.yaml override)
-2. Rotate exposed API keys
+1. Rotate exposed API keys
+2. Set `TRIGGER_SECRET` on VPS
 3. Add Tash's Telegram ID for partner access
 4. Phase 3: Notion integration (bidirectional sync)
 

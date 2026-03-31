@@ -26,8 +26,10 @@
 - [x] Security hardening: Finding 3 — Secret session binding, atomic magic-link CAS, field validation (`src/ui/session.ts`, `src/ui/serve.ts`, `src/secrets/store.ts`)
 - [x] Security hardening: Finding 4 — Async DNS SSRF validation, metadata IP blocklist, redirect rejection (`src/utils/url-validator.ts`, `src/channels/webhook.ts`)
 - [x] Security hardening: Finding 5 — Slack owner gating on actions and reactions (`src/channels/slack-actions.ts`, `src/channels/slack.ts`)
-- [x] Production port binding — `docker-compose.prod.yaml` (localhost only)
-- [x] Deploy workflow updated for prod override and SSH-based smoke test
+- [x] Production port binding — `docker-compose.prod.yaml` with `!override` (127.0.0.1 only, invisible from internet)
+- [x] Deploy workflow with SSH-based smoke test
+- [x] Fix mock.module test pollution (slack-actions-owner.test.ts leaking into feedback.test.ts in CI)
+- [x] End-to-end pipeline verified: merge → CI (943 tests) → Docker build → GHCR push → SSH deploy → health check → smoke test — all green
 - [x] Migration for `magic_token_used` column (`20260331000003_secret_magic_token_used.sql`)
 
 ## Decisions
@@ -74,6 +76,8 @@
 **V-6.02**: Spec described three separate workflows (CI, Deploy, Release). Deploy and Release reuse CI as a called workflow via `workflow_call` rather than duplicating test steps.
 
 **V-6.03**: 140 pre-existing lint errors and several type errors had to be fixed before CI could pass. These were never caught because the old CI only ran on PRs, not on pushes to main.
+
+**V-6.04**: Initial `docker-compose.prod.yaml` failed because Compose appends list items from overrides instead of replacing them, creating a dual-bind conflict (`0.0.0.0:3100` + `127.0.0.1:3100`). Fixed with the `!override` YAML tag — Compose's official mechanism for list replacement.
 
 ## Open Decisions
 

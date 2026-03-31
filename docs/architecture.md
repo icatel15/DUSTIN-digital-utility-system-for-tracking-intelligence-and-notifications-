@@ -65,7 +65,7 @@ Phantom is a single Bun process that runs on a VM. It combines an agent runtime,
 - `/webhook` - Inbound webhook receiver
 - `/ui/*` - Secrets UI and static assets
 
-**Production deployment**: Port 3100 is bound to `127.0.0.1` only via `docker-compose.prod.yaml`. External HTTPS access requires a reverse proxy (Caddy, nginx, etc.) in front of the container. The deploy workflow uses `docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d`.
+**Production deployment**: Port 3100 is bound to `127.0.0.1` only via `docker-compose.prod.yaml` (uses `!override` to replace the base ports list). The port is not reachable from the internet. The deploy workflow runs `docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d`.
 
 ### Channel Router
 
