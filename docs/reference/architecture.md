@@ -94,7 +94,7 @@ Channels: Slack (Socket Mode), Telegram (long polling), Email (IMAP/SMTP), Webho
 - **Semantic** - Accumulated facts with contradiction detection
 - **Procedural** - Learned workflows and procedures
 
-Embeddings via Ollama (nomic-embed-text, 768d vectors). Hybrid search using dense vectors + BM25 sparse vectors with RRF fusion.
+Embeddings via OpenAI (text-embedding-3-small, 1536d vectors). Hybrid search using dense vectors + BM25 sparse vectors with RRF fusion.
 
 ### Self-Evolution Engine
 

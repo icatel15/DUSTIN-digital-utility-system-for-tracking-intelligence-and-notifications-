@@ -86,7 +86,7 @@ curl -fsSL https://raw.githubusercontent.com/ghostwright/phantom/main/.env.examp
 docker compose up -d
 ```
 
-Your Phantom is running. Qdrant starts for memory, Ollama pulls the embedding model, and the agent boots. Check health at `http://localhost:3100/health`. With Slack configured, it DMs you when it's ready. Add `RESEND_API_KEY` for email sending. See [Getting Started](docs/getting-started.md) for full setup.
+Your Phantom is running. Qdrant starts for memory, Ollama pulls the embedding model, and the agent boots. Check health at `http://localhost:3100/health`. With Slack configured, it DMs you when it's ready. Add `RESEND_API_KEY` for email sending. See [Getting Started](docs/guides/getting-started.md) for full setup.
 
 ### Managed (free)
 
@@ -306,7 +306,7 @@ bun run lint          # Biome
 bun run typecheck     # tsc --noEmit
 ```
 
-See [docs/getting-started.md](docs/getting-started.md) for detailed Slack setup, .env configuration, VM deployment, and troubleshooting.
+See [docs/guides/getting-started.md](docs/guides/getting-started.md) for detailed Slack setup, .env configuration, VM deployment, and troubleshooting.
 
 </details>
 

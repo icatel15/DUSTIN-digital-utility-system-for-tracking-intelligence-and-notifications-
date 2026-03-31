@@ -1,3 +1,5 @@
+> **ARCHIVED**: This document describes the pre-Phase 1 Phantom/systemd deployment workflow. It has been superseded by the CI/CD pipeline (see [ci-cd.md](../guides/ci-cd.md)) and Docker-based deployment. Kept for historical reference only.
+
 # Phantom Docker Deploy Guide
 
 How to deploy Phantom to Specter-provisioned VMs using the Docker Hub image. This is the deployment method for Phantom Cloud and all new VMs going forward.
@@ -61,7 +63,7 @@ The `PHANTOM_MODEL` env var overrides the model at both init time (written to ph
 
 ## Create a Slack App
 
-Each Phantom instance needs its own Slack app. See `docs/deploy-checklist.md` Step 2 for the full manifest and setup instructions. The short version:
+Each Phantom instance needs its own Slack app. See `docs/archive/deploy-checklist.md` Step 2 for the full manifest and setup instructions. The short version:
 
 1. api.slack.com/apps > Create New App > From a manifest
 2. Use the YAML manifest from `slack-app-manifest.yaml` (change the name)

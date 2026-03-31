@@ -18,7 +18,7 @@ Replace local infrastructure (Qdrant Docker, Ollama, SQLite) with managed servic
 
 ## Feature Doc
 
-Full specification with acceptance criteria: [`docs/phase-1-data-layer-swap.md`](../phase-1-data-layer-swap.md)
+Full specification with acceptance criteria: [`docs/specs/phase-1-data-layer-swap.md`](../specs/phase-1-data-layer-swap.md)
 
 ## Acceptance Criteria
 

@@ -389,5 +389,5 @@ Or just ask your Phantom in Slack: "Create an MCP token for Claude Code." It wil
 - [MCP](mcp.md) - connect external clients and other Phantoms
 - [Roles](roles.md) - customize your Phantom's specialization
 - [Self-Evolution](self-evolution.md) - how the agent improves over time
-- [Security](security.md) - auth, secrets, permissions, and hardening
-- [Architecture](architecture.md) - understand the system design
+- [Security](../reference/security.md) - auth, secrets, permissions, and hardening
+- [Architecture](../reference/architecture.md) - understand the system design

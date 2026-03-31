@@ -30,7 +30,7 @@ All fixes stay within the existing architecture. No new dependencies are introdu
 | Durable audit logging | `src/core/server.ts`, `src/core/server.ts` (TriggerDeps type), `src/index.ts` | Wire `AuditLogger` into `TriggerDeps`. Persist to `mcp_audit` table (not `audit_log`). Log metadata only: source, conversationId, delivery target, task length, task hash. **Do not persist raw task text** — it may contain secrets or sensitive prompts. Log rejected auth attempts without parsing body. |
 | Localhost-only port binding | `docker-compose.prod.yaml` (new override) | Bind `127.0.0.1:${PORT:-3100}:3100` in production override only. Do not change base `docker-compose.yaml`. |
 | Deploy workflow update | `.github/workflows/deploy.yml` | Health check probes via `localhost` or Docker internal network, not `${{ secrets.VPS_HOST }}:3100`. |
-| Documentation | `docs/architecture.md` | Document reverse-proxy dependency for production. |
+| Documentation | `docs/reference/architecture.md` | Document reverse-proxy dependency for production. |
 
 **Reviewer note:** `console.warn`/`console.log` is operational logging, not audit. The `AuditLogger` write is the durable record. If rate limits are later keyed off `x-forwarded-for`, only trust it behind a known proxy.
 
@@ -168,7 +168,7 @@ Each finding requires tests before merge:
 ## Implementation Notes
 
 - Finding 3 required two review rounds: initial implementation allowed generic UI sessions to bypass binding (null requestId passed the guard). Fixed by requiring exact `boundRequestId === requestId` match. Magic-link consumption changed from two-step validate+consume to atomic CAS UPDATE. Migration `20260331000003_secret_magic_token_used.sql` adds the `magic_token_used` column.
-- Production port binding (`docker-compose.prod.yaml`) requires a reverse proxy for external HTTPS — documented in `docs/architecture.md`.
+- Production port binding (`docker-compose.prod.yaml`) requires a reverse proxy for external HTTPS — documented in `docs/reference/architecture.md`.
 - Finding 4 documents a known limitation: full DNS rebinding protection requires IP pinning at connect time. The double-check (acceptance + fetch-time validation) raises the bar but is defense-in-depth, not complete.
 
 ## Sign-Off

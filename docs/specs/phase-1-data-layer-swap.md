@@ -135,7 +135,7 @@ embeddings: z.object({
 **`src/db/schema.ts`** — Replace SQLite DDL with Supabase migration:
 - Create `supabase/migrations/` directory
 - Initial migration creates Phantom's existing tables (sessions, cost_events, onboarding_state, dynamic_tools, scheduled_jobs, secrets, secret_requests) in Postgres syntax
-- Second migration creates DUSTIN-specific tables (users, config_versions, notion_sync_state, audit_log, evolution_observations) per `docs/schema.md`
+- Second migration creates DUSTIN-specific tables (users, config_versions, notion_sync_state, audit_log, evolution_observations) per `docs/reference/schema.md`
 
 **`src/db/migrate.ts`** — Update for Postgres:
 - Run migrations via Supabase SQL or migration runner
@@ -162,7 +162,7 @@ embeddings: z.object({
 
 - [ ] AC-3.1: Agent boots and connects to Supabase using `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`
 - [ ] AC-3.2: All 7 Phantom tables exist in Supabase with Postgres-compatible schema
-- [ ] AC-3.3: All 6 DUSTIN-specific tables exist per `docs/schema.md`
+- [ ] AC-3.3: All 6 DUSTIN-specific tables exist per `docs/reference/schema.md`
 - [ ] AC-3.4: Session creation and retrieval works via Supabase
 - [ ] AC-3.5: Cost tracking inserts and aggregation work via Supabase
 - [ ] AC-3.6: Scheduled jobs CRUD works via Supabase

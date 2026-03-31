@@ -1,3 +1,5 @@
+> **ARCHIVED**: This document describes the pre-Phase 1 Phantom/systemd deployment workflow. It has been superseded by the CI/CD pipeline (see [ci-cd.md](../guides/ci-cd.md)) and Docker-based deployment. Kept for historical reference only.
+
 # Phantom Deployment Checklist
 
 Step-by-step guide to deploy a Phantom agent for a user.

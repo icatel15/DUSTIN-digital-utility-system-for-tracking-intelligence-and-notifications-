@@ -1,6 +1,6 @@
 # Phase 5 — Web Dashboard
 
-**Spec**: `docs/phase-5-web-dashboard.md`
+**Spec**: `docs/specs/phase-5-web-dashboard.md`
 **Status**: Spec approved, implementation not started
 
 ## Sub-Phases

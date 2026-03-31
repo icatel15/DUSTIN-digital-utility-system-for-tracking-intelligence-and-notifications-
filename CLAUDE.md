@@ -301,7 +301,7 @@ docs/status/
 
 ### Project-Specific Conventions (Required)
 
-Every project must have a `docs/conventions.md` file documenting its language and framework conventions. If this file does not exist when an agent begins work, the agent must create it before writing any implementation code. At minimum, it must cover:
+Every project must have a `docs/reference/conventions.md` file documenting its language and framework conventions. If this file does not exist when an agent begins work, the agent must create it before writing any implementation code. At minimum, it must cover:
 
 - **Language and runtime** — Version, type system requirements (e.g., strict mode, type hints on all signatures).
 - **Async patterns** — When to use async/await vs synchronous code.
@@ -318,14 +318,14 @@ Every project must maintain the following files in `docs/`. If any file does not
 
 | File | Purpose |
 | --- | --- |
-| `docs/conventions.md` | Language and framework coding conventions (see checklist above) |
-| `docs/tech-stack.md` | Layer-to-technology mapping with versions |
-| `docs/architecture.md` | Service boundaries, data flow, environment variables |
-| `docs/schema.md` | Database schema domains, key tables, relationships |
-| `docs/glossary.md` | Project-specific terminology and domain concepts |
-| `docs/directory.md` | Project structure map — what lives where, entry points, key paths |
+| `docs/reference/conventions.md` | Language and framework coding conventions (see checklist above) |
+| `docs/reference/tech-stack.md` | Layer-to-technology mapping with versions |
+| `docs/reference/architecture.md` | Service boundaries, data flow, environment variables |
+| `docs/reference/schema.md` | Database schema domains, key tables, relationships |
+| `docs/reference/glossary.md` | Project-specific terminology and domain concepts |
+| `docs/reference/directory.md` | Project structure map — what lives where, entry points, key paths |
 
-#### `docs/tech-stack.md`
+#### `docs/reference/tech-stack.md`
 
 Table mapping each layer to its technology and version. At minimum:
 
@@ -336,7 +336,7 @@ Table mapping each layer to its technology and version. At minimum:
 - CI/CD tooling
 - Key libraries and their roles
 
-#### `docs/architecture.md`
+#### `docs/reference/architecture.md`
 
 How the system fits together. At minimum:
 
@@ -344,7 +344,7 @@ How the system fits together. At minimum:
 - Data flow — how data moves from external sources through the system to the user.
 - Environment variables — list of required env vars with descriptions, which are public vs secret, and which services use them.
 
-#### `docs/schema.md`
+#### `docs/reference/schema.md`
 
 Database structure and conventions. At minimum:
 
@@ -353,7 +353,7 @@ Database structure and conventions. At minimum:
 - Security model — RLS policies, permission patterns, role definitions.
 - Migration conventions — naming format, process for schema changes.
 
-#### `docs/glossary.md`
+#### `docs/reference/glossary.md`
 
 Project-specific terminology that agents need to understand. At minimum:
 
@@ -361,7 +361,7 @@ Project-specific terminology that agents need to understand. At minimum:
 - Platform concepts — internal abstractions, pipeline stages, scoring models, or system-specific terminology.
 - Update this file whenever new domain terminology is introduced.
 
-#### `docs/directory.md`
+#### `docs/reference/directory.md`
 
 Project structure map for agent orientation. At minimum:
 

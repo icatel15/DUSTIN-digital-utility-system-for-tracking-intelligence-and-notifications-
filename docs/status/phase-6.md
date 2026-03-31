@@ -6,7 +6,7 @@
 
 ## Deliverables
 
-- [x] CI/CD pipeline spec documented (`docs/ci-cd.md`)
+- [x] CI/CD pipeline spec documented (`docs/guides/ci-cd.md`)
 - [x] Strengthen CI workflow — PR trigger, Bun caching, reusable via workflow_call (`.github/workflows/ci.yml`)
 - [x] Deploy workflow — Docker build → push to GHCR → SSH deploy → health check → rollback (`.github/workflows/deploy.yml`)
 - [x] Automatic rollback on health check failure (built into deploy.yml)

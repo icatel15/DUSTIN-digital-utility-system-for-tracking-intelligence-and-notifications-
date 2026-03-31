@@ -24,7 +24,13 @@ Structure map for DUSTIN. Based on Phantom v0.18.1 layout.
 │   ├── mcp.yaml          — MCP auth tokens
 │   └── roles/            — Role YAML definitions
 ├── phantom-config/       — Evolved config (grows over time via self-evolution)
-├── docs/                 — Documentation (architecture, specs, this directory)
+├── docs/                 — Documentation (see subdirectory breakdown below)
+│   ├── specs/            — Feature specifications (what to build)
+│   ├── guides/           — How-to guides (how to do things)
+│   ├── reference/        — Lookup material (facts about the system)
+│   ├── status/           — Project tracking (phase progress, decisions)
+│   ├── archive/          — Superseded docs (kept for historical reference)
+│   └── assets/           — Images, SVGs, GIFs
 ├── public/               — Publicly served files (dashboards, pages, tools)
 ├── scripts/              — Docker entrypoint, deploy scripts, VPS migration
 ├── .github/workflows/    — CI/CD pipelines (ci.yml, deploy.yml, release.yml)
@@ -46,8 +52,9 @@ Structure map for DUSTIN. Based on Phantom v0.18.1 layout.
 
 ## Directories Receiving CLAUDE.md Files
 
-The following directories will receive subfolder CLAUDE.md files as development progresses:
+The following directories have or will receive subfolder CLAUDE.md files:
 
+- `docs/` — Documentation taxonomy and cross-reference conventions
 - `src/` — Overall source conventions and module boundaries
 - `src/agent/` — Prompt assembly, hooks, session lifecycle
 - `src/channels/` — Channel adapter interface and implementations

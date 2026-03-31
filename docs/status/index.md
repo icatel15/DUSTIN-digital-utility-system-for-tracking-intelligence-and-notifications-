@@ -34,9 +34,9 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 | 2 | Telegram + Two-User Support | [x] Complete |
 | 3 | Notion Integration | [ ] Not started |
 | 4 | Email Channel (Resend) | [ ] Not started |
-| 5 | Web Dashboard | [-] Spec approved (`docs/phase-5-web-dashboard.md`) |
+| 5 | Web Dashboard | [-] Spec approved (`docs/specs/phase-5-web-dashboard.md`) |
 | 6 | CI/CD Pipeline & Deployment Hardening | [x] Complete |
-| 7 | Continuous Context Management | [ ] Draft spec (`docs/phase-7-continuous-context.md`) |
+| 7 | Continuous Context Management | [ ] Draft spec (`docs/specs/phase-7-continuous-context.md`) |
 
 ## Outstanding Work
 

@@ -1,11 +1,11 @@
 # Memory System
 
-Phantom has a three-tier vector memory backed by Qdrant and Ollama. Memory persists across sessions, giving the agent context about past conversations, accumulated knowledge, and learned workflows.
+Phantom has a three-tier vector memory backed by Qdrant and OpenAI embeddings. Memory persists across sessions, giving the agent context about past conversations, accumulated knowledge, and learned workflows.
 
 ## Architecture
 
 ```
-Query -> Embedding (Ollama) -> Hybrid Search (Qdrant) -> Ranked Results -> Context Builder -> Prompt
+Query -> Embedding (OpenAI) -> Hybrid Search (Qdrant) -> Ranked Results -> Context Builder -> Prompt
 ```
 
 ### Tier 1: Episodic Memory
@@ -38,7 +38,7 @@ Learned workflows and step-by-step procedures:
 
 Hybrid search combines two strategies:
 
-- **Dense vectors** (768d, nomic-embed-text via Ollama) for semantic similarity
+- **Dense vectors** (1536d, text-embedding-3-small via OpenAI) for semantic similarity
 - **BM25 sparse vectors** (FNV-1a hash) for exact keyword matching
 
 Results are fused using Reciprocal Rank Fusion (RRF). This means searching for "authentication bug" matches both semantically similar episodes and episodes that literally mention "authentication".
@@ -75,12 +75,13 @@ Memory is configured in `config/memory.yaml` (auto-generated with defaults if no
 
 ```yaml
 qdrant:
-  url: http://localhost:6333
-ollama:
-  url: http://localhost:11434
-  model: nomic-embed-text
+  url: https://your-cluster.qdrant.io
+  api_key: ${QDRANT_API_KEY}
+openai:
+  api_key: ${OPENAI_API_KEY}
+  model: text-embedding-3-small
 embedding:
-  dimensions: 768
+  dimensions: 1536
   batch_size: 32
 context:
   max_tokens: 50000
@@ -89,13 +90,13 @@ context:
   procedure_limit: 5
 ```
 
-## Docker Services
+> **Note:** Phase 1 replaced the original Ollama (nomic-embed-text, 768d) local embeddings with OpenAI (text-embedding-3-small, 1536d) and migrated from a local Qdrant Docker container to Qdrant Cloud.
 
-Qdrant and Ollama run as Docker containers:
+## External Services
 
-```bash
-docker compose up -d
-docker exec phantom-ollama ollama pull nomic-embed-text
-```
+Memory depends on two managed services:
 
-If Docker services are unavailable, Phantom degrades gracefully. Memory is unavailable but the agent still works.
+- **Qdrant Cloud** — vector database for all three memory tiers
+- **OpenAI API** — text-embedding-3-small for generating 1536d embeddings
+
+If either service is unavailable, Phantom degrades gracefully. Memory is unavailable but the agent still works.

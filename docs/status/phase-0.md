@@ -11,7 +11,7 @@
 - [x] Create docs suite (tech-stack, schema, conventions, glossary, directory)
 - [x] Codebase reconnaissance (map Qdrant, SQLite, Ollama coupling)
 - [x] Create docs/status tracking files
-- [x] Phase 1 feature doc with acceptance criteria → `docs/phase-1-data-layer-swap.md`
+- [x] Phase 1 feature doc with acceptance criteria → `docs/specs/phase-1-data-layer-swap.md`
 
 ## Decisions
 
