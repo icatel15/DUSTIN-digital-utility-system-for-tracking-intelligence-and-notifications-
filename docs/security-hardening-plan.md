@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-31
 **Status:** Awaiting final approval
-**Scope:** 5 findings from external security review of HEAD (commit `11d53a6`)
+**Scope:** 5 findings from external security review of HEAD (commit `3e521cc`)
 
 ---
 
@@ -91,13 +91,12 @@ phantom_repo_info: "read"
 |--------|---------|--------|
 | Bound session constructor | `src/ui/session.ts` | Add `createBoundSession(requestId)` that stores the `requestId` in the session. Keep existing `createSession()` for generic UI login (with `requestId: null`). Add `getSessionRequestId(token)` accessor. |
 | Bind on magic link exchange | `src/ui/serve.ts:180` | Call `createBoundSession(requestId)` instead of `createSession()`. |
+| Single-use magic-link consumption | `src/ui/serve.ts`, `src/secrets/store.ts`, `supabase/migrations/*` | Consume the magic token on first successful exchange for a bound session. Prevent replay within the original TTL by marking the token used or removing the stored hash after first use. |
 | Validate binding on form access | `src/ui/serve.ts:191` | Check `getSessionRequestId()` matches the URL's requestId. Return 403 if mismatched. |
 | Validate binding on save | `src/ui/serve.ts:94` | Same requestId binding check before `handleSecretSave()`. |
 | Reject undeclared fields | `src/secrets/store.ts:128` | Throw error if submitted field name is not in `request.fields`. |
 | Enforce required fields | `src/secrets/store.ts` | Before saving, check all `required: true` fields have non-empty values. Throw with list of missing field names. |
 | Reject empty submissions | `src/secrets/store.ts` | Do not mark request completed if `saved.length === 0`. Throw error. |
-
-**Reviewer recommendation:** Make the magic token single-use when first exchanged for a bound session. The bound-session fix closes cross-request abuse, but replay of the same magic link within its 10-minute TTL is still possible. Consume it on first use by calling `validateMagicToken` only once and marking it consumed in the database (add a `magic_token_used` boolean or delete the hash after first use).
 
 ---
 
@@ -158,11 +157,11 @@ Findings 1, 3, and 5 are independent and can be implemented in parallel. Finding
 
 Each finding requires tests before merge:
 
-1. **Trigger:** Test rejected without token, rejected with wrong token, accepted with correct token, rate-limited after burst, 404 when `TRIGGER_SECRET` unset.
-2. **MCP scopes:** Test read-only token blocked from admin tools, operator token blocked from admin tools, admin token allowed everywhere, unknown tool name requires admin, session reuse with different client rejected.
-3. **Secrets:** Test bound session can only access its own requestId, undeclared field names rejected, missing required fields rejected, empty submission does not complete request.
-4. **Webhook SSRF:** Test hostname resolving to private IP rejected, `::ffff:10.0.0.1` rejected, `100.100.100.200` rejected, redirect response treated as failure, re-validation at fetch time.
-5. **Slack:** Test non-owner button click dropped, non-owner reaction dropped, owner clicks processed normally.
+1. **Trigger:** Test 404 when `TRIGGER_SECRET` is unset; rejected without bearer token; rejected with wrong token; accepted with correct token; rate-limited after burst; accepted request writes an `mcp_audit` row; rejected auth attempt writes an audit row; audit entry stores metadata only and does not contain raw `task` text.
+2. **MCP scopes:** Test read token can access read tools but is blocked from operator/admin tools; operator token can access operator/read tools but is blocked from admin tools; admin token is allowed everywhere; unknown tool name requires admin; dynamic tools require admin; existing session reused by a different client is rejected.
+3. **Secrets:** Test bound session can only access its own `requestId`; session bound to another request is rejected; generic UI session cannot save a bound secret request; undeclared field names are rejected; missing required fields are rejected; empty submission does not complete request; failed validation leaves the request pending; the same magic link cannot be exchanged twice.
+4. **Webhook SSRF:** Test literal private IPv4 is rejected; private or link-local IPv6 is rejected; IPv4-mapped IPv6 such as `::ffff:10.0.0.1` is rejected; metadata IPs such as `169.254.169.254`, `100.100.100.200`, and `fd00:ec2::254` are rejected; blocked metadata hostnames are rejected; hostname resolving to private or metadata IP is rejected; redirect response is treated as failure with `redirect: "manual"`; fetch-time re-validation rejects when DNS answers change between acceptance and send.
+5. **Slack:** Test non-owner feedback button click is dropped; non-owner agent action click is dropped; non-owner reaction is dropped; owner button clicks and reactions are processed normally; behavior remains unchanged when no owner is configured, if that mode is still supported.
 
 ---
 
