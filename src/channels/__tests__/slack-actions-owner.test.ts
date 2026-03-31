@@ -122,7 +122,7 @@ describe("registerSlackActions owner gating", () => {
 	describe("owner feedback button clicks are processed normally", () => {
 		test("emitFeedback IS called for owner positive feedback", async () => {
 			const ownerChecker: OwnerChecker = (uid) => uid === "UOWNER";
-			const { app, mockChatUpdate } = createMockApp();
+			const { app } = createMockApp();
 			registerSlackActions(app as any, ownerChecker);
 
 			const body = buildFeedbackBody("UOWNER", "phantom:feedback:positive", "msg123");

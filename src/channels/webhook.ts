@@ -5,7 +5,7 @@
  */
 
 import { randomUUID, timingSafeEqual } from "node:crypto";
-import { isSafeCallbackUrl, isSafeCallbackUrlAsync } from "../utils/url-validator.ts";
+import { isSafeCallbackUrlAsync } from "../utils/url-validator.ts";
 import type { Channel, ChannelCapabilities, InboundMessage, OutboundMessage, SentMessage } from "./types.ts";
 
 export type WebhookChannelConfig = {

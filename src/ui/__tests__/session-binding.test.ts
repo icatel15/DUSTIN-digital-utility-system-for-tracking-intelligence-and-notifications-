@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import type { SecretField, SecretRequest } from "../../secrets/store.ts";
+import type { SecretRequest } from "../../secrets/store.ts";
 import { saveSecrets, validateAndConsumeMagicToken } from "../../secrets/store.ts";
 import { handleUiRequest, setSecretsDb } from "../serve.ts";
 import {

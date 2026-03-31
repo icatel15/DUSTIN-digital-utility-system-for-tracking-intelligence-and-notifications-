@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { AuthMiddleware, TOOL_SCOPES, getRequiredScope } from "../auth.ts";
 import { hashTokenSync } from "../config.ts";
 import { McpTransportManager } from "../transport.ts";
-import type { AuthResult, McpConfig, McpScope } from "../types.ts";
+import type { AuthResult, McpConfig } from "../types.ts";
 
 // ---------------------------------------------------------------------------
 // Shared test tokens & config

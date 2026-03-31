@@ -2,7 +2,7 @@ import { relative, resolve } from "node:path";
 import type { SupabaseClient } from "../db/connection.ts";
 import { createSSEResponse } from "./events.ts";
 import { loginPageHtml } from "./login-page.ts";
-import { consumeMagicLink, createBoundSession, createSession, getSessionRequestId, isValidSession } from "./session.ts";
+import { consumeMagicLink, createBoundSession, getSessionRequestId, isValidSession } from "./session.ts";
 
 import { secretsExpiredHtml, secretsFormHtml } from "../secrets/form-page.ts";
 import { getSecretRequest, saveSecrets, validateAndConsumeMagicToken } from "../secrets/store.ts";
