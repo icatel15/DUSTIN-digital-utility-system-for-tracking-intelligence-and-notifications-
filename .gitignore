@@ -1,14 +1,44 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+
+# Local data (SQLite, secrets)
 data/
-.env.*
-.env.local
-.env
-local/
-*.log
 *.db
 *.db-wal
 *.db-shm
-.DS_Store
-bun.lockb
+
+# Environment / secrets
+.env
+.env.*
+.env.local
+
+# Local working files
+local/
 HANDOFFS.md
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Bun
+bun.lockb
+
+# Supabase local
+supabase/.temp/
+supabase/.branches/
+
+# Phantom evolved config (agent-specific, not shared)
+# Uncomment if you don't want to track evolved config:
+# phantom-config/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

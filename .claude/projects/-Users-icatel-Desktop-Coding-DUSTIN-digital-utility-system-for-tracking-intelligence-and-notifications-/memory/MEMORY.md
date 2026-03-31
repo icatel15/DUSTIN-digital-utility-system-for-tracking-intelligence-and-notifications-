@@ -1,0 +1,2 @@
+- [User Profile](user_profile.md) — Project owner, builds DUSTIN for self and wife, works at J.P. Morgan (excluded), uses Notion daily
+- [DUSTIN Project Status](project_dustin_status.md) — Phase 0 complete, Phase 1 (data layer swap) next, recon shows clean abstractions
