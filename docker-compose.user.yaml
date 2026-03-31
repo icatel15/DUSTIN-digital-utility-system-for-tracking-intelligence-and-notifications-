@@ -1,6 +1,6 @@
 # DUSTIN AI Agent - Docker Compose (pre-built image)
 #
-# Run DUSTIN from Docker Hub without cloning the repo.
+# Run DUSTIN from GHCR without cloning the repo.
 # Memory and embeddings use managed services (Qdrant Cloud + OpenAI).
 #
 # Quick start:
@@ -14,10 +14,10 @@
 services:
   # =========================================================================
   # DUSTIN: The AI agent
-  # Pulls the pre-built image from Docker Hub. No build step needed.
+  # Pulls the pre-built image from GHCR. No build step needed.
   # =========================================================================
   dustin:
-    image: ghostwright/phantom:latest
+    image: ghcr.io/icatel15/dustin:latest
     container_name: dustin
     ports:
       - "${PORT:-3100}:3100"

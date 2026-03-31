@@ -8,19 +8,21 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 
 ## Current Phase
 
-**Phase 0 — Setup & Documentation** (complete)
+**Phase 6 — CI/CD Pipeline & Deployment Hardening** (in progress)
 
 ## Current State
 
-- Phase 1 complete: all managed services wired (Qdrant Cloud, OpenAI embeddings, Supabase)
-- 789 tests passing, zero `bun:sqlite` in production code
-- Docker Compose stripped to DUSTIN container only (no Qdrant/Ollama)
-- Supabase migration files created for all 14 tables (9 Phantom + 5 DUSTIN)
-- Ready to begin Phase 2 (Telegram channel + two-user support)
+- DUSTIN live on Hetzner VPS (178.104.134.128), responding via Telegram (@Dustin_CWBot)
+- Telegram two-user mode active (Woody = owner, Tash = partner pending ID)
+- All managed services connected: Qdrant Cloud, OpenAI embeddings, Supabase
+- Self-evolution running (generation 5, LLM judges enabled)
+- 804 tests passing
+- Deploy is manual (scp + systemctl restart) — migrating to Docker + CI/CD
+- CI/CD spec documented (`docs/ci-cd.md`)
 
 ## Active Phase File
 
-`docs/status/phase-2.md` (to be created)
+`docs/status/phase-6.md`
 
 ## Phase Roadmap
 
@@ -28,16 +30,31 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 |-------|------|--------|
 | 0 | Setup & Documentation | [x] Complete |
 | 1 | Data Layer Swap (Qdrant Cloud, OpenAI embeddings, Supabase) | [x] Complete |
-| 2 | Channel Configuration (Telegram, Resend, Webhook) | [ ] Not started |
+| 2 | Telegram + Two-User Support | [x] Complete |
 | 3 | Notion Integration | [ ] Not started |
-| 4 | DUSTIN Persona & Evolution Customization | [ ] Not started |
+| 4 | Email Channel (Resend) | [ ] Not started |
+| 5 | Web Dashboard | [ ] Not started |
+| 6 | CI/CD Pipeline & Deployment Hardening | [-] In progress |
+
+## Outstanding Work
+
+- [-] CI/CD pipeline (Phase 6 — spec done, implementation next)
+- [ ] VPS migration: systemd → Docker
+- [ ] Add Tash's Telegram user ID for partner access
+- [ ] Custom domain + Caddy HTTPS
+- [ ] Notion integration (Phase 3)
+- [ ] Email via Resend (Phase 4)
+- [ ] Web admin dashboard (Phase 5)
+- [ ] Remove debug logging artifacts from production code
+- [ ] Rotate API keys exposed during setup (Anthropic, OpenAI, Qdrant, Telegram bot token)
 
 ## Next Steps
 
-1. Set up external services (Qdrant Cloud, Supabase project, OpenAI API key) and run `supabase db push`
-2. Write Phase 2 feature doc (Telegram channel + two-user support)
-3. Begin Phase 2 implementation
+1. Implement CI/CD workflows (Phase 6)
+2. Migrate VPS from systemd to Docker
+3. Rotate exposed API keys
+4. Add Tash's Telegram ID for partner access
 
 ## Open Decisions
 
-See `docs/status/open-decisions.md` — no open decisions currently.
+See `docs/status/open-decisions.md` — all resolved (OD-06: `ghostwright/dustin`, OD-07: `dustin` user).

@@ -1,0 +1,135 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/icatel15/dustin
+
+jobs:
+  # ── Gate: CI must pass before deploy ──────────────────────────────
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  # ── Build Docker image and push to GHCR ───────────────────────────
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Deploy to Hetzner VPS ─────────────────────────────────────────
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: dustin
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /home/dustin/app
+
+            # Record current image digest for rollback
+            PREVIOUS_DIGEST=$(docker inspect dustin --format '{{.Image}}' 2>/dev/null || echo "none")
+            echo "Previous digest: $PREVIOUS_DIGEST"
+
+            # Pull new image and restart
+            docker compose pull dustin
+            docker compose up -d dustin
+
+            # Health check: poll /health every 5s for up to 120s
+            # (matches Dockerfile HEALTHCHECK --start-period=120s)
+            echo "Waiting for health check..."
+            ELAPSED=0
+            while [ $ELAPSED -lt 120 ]; do
+              HEALTH=$(curl -sf http://localhost:3100/health 2>/dev/null || true)
+              if echo "$HEALTH" | grep -q '"status":"ok"'; then
+                echo "Health check passed"
+                echo "$HEALTH" | python3 -m json.tool 2>/dev/null || echo "$HEALTH"
+                exit 0
+              fi
+              sleep 5
+              ELAPSED=$((ELAPSED + 5))
+              echo "  waiting... ${ELAPSED}s"
+            done
+
+            # Health check failed — rollback
+            echo "Health check failed after 120s — rolling back"
+            if [ "$PREVIOUS_DIGEST" != "none" ]; then
+              # Verify old image still exists locally before stopping
+              if docker inspect "$PREVIOUS_DIGEST" > /dev/null 2>&1; then
+                docker compose down
+                docker tag "$PREVIOUS_DIGEST" ghcr.io/icatel15/dustin:latest
+                docker compose up -d dustin
+                echo "Rolled back to previous image"
+              else
+                echo "ERROR: Previous image $PREVIOUS_DIGEST not found locally — cannot roll back"
+                echo "Container is still running with the new (unhealthy) image"
+              fi
+            else
+              echo "No previous image to roll back to"
+            fi
+            exit 1
+
+  # ── External smoke test ───────────────────────────────────────────
+  smoke-test:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify health from outside
+        run: |
+          HEALTH=$(curl -sf http://${{ secrets.VPS_HOST }}:3100/health 2>/dev/null || true)
+          if echo "$HEALTH" | jq -e '.status == "ok"' > /dev/null 2>&1; then
+            echo "Smoke test passed"
+            echo "$HEALTH" | jq .
+          else
+            echo "Smoke test failed"
+            echo "Response: $HEALTH"
+            exit 1
+          fi
