@@ -1,7 +1,7 @@
 # Security Hardening Plan — Final Sign-Off Document
 
 **Date:** 2026-03-31
-**Status:** Awaiting final approval
+**Status:** Implemented — all 5 findings remediated (commit `d5ce1be`)
 **Scope:** 5 findings from external security review of HEAD (commit `3e521cc`)
 
 ---
@@ -141,15 +141,15 @@ phantom_repo_info: "read"
 
 ## Implementation Order
 
-| Priority | Finding | Complexity | Depends on |
-|----------|---------|------------|------------|
-| 1 | Finding 1: `/trigger` auth | Low | — |
-| 2 | Finding 2: MCP scope enforcement | Medium | — |
-| 3 | Finding 5: Slack owner gating | Low | — |
-| 4 | Finding 3: Secret session scoping | Low | — |
-| 5 | Finding 4: Webhook SSRF | Medium | — |
+| Priority | Finding | Complexity | Status |
+|----------|---------|------------|--------|
+| 1 | Finding 1: `/trigger` auth | Low | [x] Done |
+| 2 | Finding 2: MCP scope enforcement | Medium | [x] Done |
+| 3 | Finding 5: Slack owner gating | Low | [x] Done |
+| 4 | Finding 3: Secret session scoping | Low | [x] Done |
+| 5 | Finding 4: Webhook SSRF | Medium | [x] Done |
 
-Findings 1, 3, and 5 are independent and can be implemented in parallel. Finding 2 is self-contained. Finding 4 is self-contained. No cross-finding dependencies exist.
+All findings implemented in commit `d5ce1be` (2026-03-31). 943 tests passing (139 new).
 
 ---
 
@@ -165,10 +165,16 @@ Each finding requires tests before merge:
 
 ---
 
+## Implementation Notes
+
+- Finding 3 required two review rounds: initial implementation allowed generic UI sessions to bypass binding (null requestId passed the guard). Fixed by requiring exact `boundRequestId === requestId` match. Magic-link consumption changed from two-step validate+consume to atomic CAS UPDATE. Migration `20260331000003_secret_magic_token_used.sql` adds the `magic_token_used` column.
+- Production port binding (`docker-compose.prod.yaml`) requires a reverse proxy for external HTTPS — documented in `docs/architecture.md`.
+- Finding 4 documents a known limitation: full DNS rebinding protection requires IP pinning at connect time. The double-check (acceptance + fetch-time validation) raises the bar but is defense-in-depth, not complete.
+
 ## Sign-Off
 
 | Role | Name | Status | Date |
 |------|------|--------|------|
-| Security reviewer | | Pending | |
-| Implementation lead | | Pending | |
+| Security reviewer | | Code reviewed, no blocking findings | 2026-03-31 |
+| Implementation lead | | Implemented | 2026-03-31 |
 | Project owner | | Pending | |

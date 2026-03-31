@@ -23,7 +23,11 @@ function buildConfig(): McpConfig {
 }
 
 // Pre-built AuthResult values for transport-layer tests
-const adminAuth: AuthResult = { authenticated: true, clientName: "admin-client", scopes: ["read", "operator", "admin"] };
+const adminAuth: AuthResult = {
+	authenticated: true,
+	clientName: "admin-client",
+	scopes: ["read", "operator", "admin"],
+};
 const operatorAuth: AuthResult = { authenticated: true, clientName: "operator-client", scopes: ["read", "operator"] };
 const readAuth: AuthResult = { authenticated: true, clientName: "read-client", scopes: ["read"] };
 const unauthenticated: AuthResult = { authenticated: false, error: "Missing Authorization header" };

@@ -212,11 +212,7 @@ describe("registerSlackActions owner gating", () => {
 			const { app, mockChatUpdate } = createMockApp();
 			registerSlackActions(app as any, undefined);
 
-			const body = buildAgentActionBody(
-				"UANYONE",
-				"phantom:action:0",
-				JSON.stringify({ label: "Do thing" }),
-			);
+			const body = buildAgentActionBody("UANYONE", "phantom:action:0", JSON.stringify({ label: "Do thing" }));
 			await invokeAction("^phantom:action:\\d+$", body, app.client);
 
 			expect(mockChatUpdate).toHaveBeenCalledTimes(1);

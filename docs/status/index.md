@@ -16,9 +16,10 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 - Telegram two-user mode active (Woody = owner, Tash = partner pending ID)
 - All managed services connected: Qdrant Cloud, OpenAI embeddings, Supabase
 - Self-evolution running (generation 5, LLM judges enabled)
-- 804 tests passing
+- 943 tests passing
 - CI/CD pipeline live: merge to main → auto-deploy via Docker + GHCR
 - Running via Docker on VPS (migrated from systemd 2026-03-31)
+- Security hardening complete: 5 findings remediated (commit `d5ce1be`, 2026-03-31)
 
 ## Active Phase File
 
@@ -39,18 +40,21 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 ## Outstanding Work
 
 - [ ] Add Tash's Telegram user ID for partner access
-- [ ] Custom domain + Caddy HTTPS
+- [ ] Custom domain + Caddy HTTPS (required for production — port now localhost-only)
 - [ ] Notion integration (Phase 3)
 - [ ] Email via Resend (Phase 4)
 - [ ] Web admin dashboard (Phase 5)
 - [ ] Remove debug logging artifacts from production code
 - [ ] Rotate API keys exposed during setup (Anthropic, OpenAI, Qdrant, Telegram bot token)
+- [ ] Set `TRIGGER_SECRET` env var on VPS for /trigger endpoint access
+- [ ] Deploy with `docker-compose.prod.yaml` override for localhost port binding
 
 ## Next Steps
 
-1. Rotate exposed API keys
-2. Add Tash's Telegram ID for partner access
-3. Phase 3: Notion integration (bidirectional sync)
+1. Deploy security hardening (set TRIGGER_SECRET, use docker-compose.prod.yaml override)
+2. Rotate exposed API keys
+3. Add Tash's Telegram ID for partner access
+4. Phase 3: Notion integration (bidirectional sync)
 
 ## Open Decisions
 

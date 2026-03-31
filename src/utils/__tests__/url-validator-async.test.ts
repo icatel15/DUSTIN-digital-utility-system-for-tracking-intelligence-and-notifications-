@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	isPrivateIp,
-	isSafeCallbackUrl,
-	isSafeCallbackUrlAsync,
-} from "../url-validator.ts";
+import { isPrivateIp, isSafeCallbackUrl, isSafeCallbackUrlAsync } from "../url-validator.ts";
 
 // ---------------------------------------------------------------------------
 // 1. Literal private IPv4 is rejected (sync)
@@ -294,17 +290,13 @@ describe("isSafeCallbackUrlAsync – literal IP parity with sync", () => {
 describe("isSafeCallbackUrlAsync – DNS resolution failures", () => {
 	test("rejects when DNS lookup fails for non-existent domain", async () => {
 		// Use a domain guaranteed to fail DNS resolution (RFC 6761)
-		const result = await isSafeCallbackUrlAsync(
-			"https://this-domain-does-not-exist.invalid/webhook",
-		);
+		const result = await isSafeCallbackUrlAsync("https://this-domain-does-not-exist.invalid/webhook");
 		expect(result.safe).toBe(false);
 		expect(result.reason).toContain("DNS resolution failed");
 	});
 
 	test("rejects when DNS lookup fails for another non-existent domain", async () => {
-		const result = await isSafeCallbackUrlAsync(
-			"https://aaaa-definitely-not-a-real-host-zzz.example/hook",
-		);
+		const result = await isSafeCallbackUrlAsync("https://aaaa-definitely-not-a-real-host-zzz.example/hook");
 		expect(result.safe).toBe(false);
 		expect(result.reason).toContain("DNS resolution failed");
 	});
@@ -315,16 +307,12 @@ describe("isSafeCallbackUrlAsync – DNS resolution failures", () => {
 // ---------------------------------------------------------------------------
 describe("isSafeCallbackUrlAsync – SSRF edge cases", () => {
 	test("rejects metadata hostname via async path", async () => {
-		const result = await isSafeCallbackUrlAsync(
-			"http://metadata.google.internal/computeMetadata/v1",
-		);
+		const result = await isSafeCallbackUrlAsync("http://metadata.google.internal/computeMetadata/v1");
 		expect(result.safe).toBe(false);
 	});
 
 	test("rejects Alibaba metadata IP via async path", async () => {
-		const result = await isSafeCallbackUrlAsync(
-			"http://100.100.100.200/latest/meta-data",
-		);
+		const result = await isSafeCallbackUrlAsync("http://100.100.100.200/latest/meta-data");
 		expect(result.safe).toBe(false);
 	});
 

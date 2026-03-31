@@ -31,12 +31,12 @@ import {
 import { closeDatabase, getDatabase } from "./db/connection.ts";
 import { runMigrations } from "./db/migrate.ts";
 import { createEmailToolServer } from "./email/tool.ts";
-import { AuditLogger } from "./mcp/audit.ts";
-import { RateLimiter } from "./mcp/rate-limiter.ts";
 import { EvolutionEngine } from "./evolution/engine.ts";
 import type { SessionSummary } from "./evolution/types.ts";
+import { AuditLogger } from "./mcp/audit.ts";
 import { PeerHealthMonitor } from "./mcp/peer-health.ts";
 import { PeerManager } from "./mcp/peers.ts";
+import { RateLimiter } from "./mcp/rate-limiter.ts";
 import { PhantomMcpServer } from "./mcp/server.ts";
 import { loadMemoryConfig } from "./memory/config.ts";
 import { type SessionData, consolidateSession, consolidateSessionWithLLM } from "./memory/consolidation.ts";

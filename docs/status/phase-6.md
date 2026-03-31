@@ -21,6 +21,14 @@
 - [x] Fix pre-existing lint errors (140 biome violations, noExplicitAny in tests)
 - [x] Fix pre-existing type errors (missing awaits, unused vars, null handling)
 - [x] Fix flaky crypto test (auth tag tamper test across Bun versions)
+- [x] Security hardening: Finding 1 — `/trigger` bearer token auth, rate limiting, audit logging (`src/core/server.ts`)
+- [x] Security hardening: Finding 2 — MCP scope enforcement at transport layer, default deny, session-to-client binding (`src/mcp/transport.ts`, `src/mcp/auth.ts`)
+- [x] Security hardening: Finding 3 — Secret session binding, atomic magic-link CAS, field validation (`src/ui/session.ts`, `src/ui/serve.ts`, `src/secrets/store.ts`)
+- [x] Security hardening: Finding 4 — Async DNS SSRF validation, metadata IP blocklist, redirect rejection (`src/utils/url-validator.ts`, `src/channels/webhook.ts`)
+- [x] Security hardening: Finding 5 — Slack owner gating on actions and reactions (`src/channels/slack-actions.ts`, `src/channels/slack.ts`)
+- [x] Production port binding — `docker-compose.prod.yaml` (localhost only)
+- [x] Deploy workflow updated for prod override and SSH-based smoke test
+- [x] Migration for `magic_token_used` column (`20260331000003_secret_magic_token_used.sql`)
 
 ## Decisions
 
@@ -48,6 +56,16 @@
 - Context: Code review found that both ci.yml and deploy.yml triggering on push to main causes double CI runs.
 - Decision: ci.yml triggers on PR and workflow_call only. deploy.yml calls ci.yml as a gate on push to main.
 - Rationale: CI runs exactly once per event. deploy.yml is the sole push-to-main workflow.
+
+**D-6.06** (2026-03-31): Atomic CAS for magic-link consumption over two-step validate+consume.
+- Context: Security review found the original two-step approach had a TOCTOU race — two concurrent requests could both validate before either consumed.
+- Decision: Single `UPDATE ... WHERE magic_token_used = false` returning affected rows. Exactly one caller succeeds.
+- Rationale: Eliminates the race condition without requiring advisory locks or serializable transactions.
+
+**D-6.07** (2026-03-31): Default deny for unknown MCP tools (admin scope required).
+- Context: Original `getRequiredScope()` defaulted to `"read"` for unknown tool names, including all dynamic tools.
+- Decision: Default to `"admin"`. Only the 17 explicitly mapped built-in tools have their intended scope.
+- Rationale: Defense-in-depth — new tools inherit the most restrictive scope until explicitly mapped.
 
 ## Deviations
 

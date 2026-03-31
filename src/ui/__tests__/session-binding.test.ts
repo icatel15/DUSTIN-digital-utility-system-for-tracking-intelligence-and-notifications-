@@ -1,5 +1,8 @@
-import { createHash } from "node:crypto";
 import { afterEach, describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
+import type { SecretField, SecretRequest } from "../../secrets/store.ts";
+import { saveSecrets, validateAndConsumeMagicToken } from "../../secrets/store.ts";
+import { handleUiRequest, setSecretsDb } from "../serve.ts";
 import {
 	consumeMagicLink,
 	createBoundSession,
@@ -8,9 +11,6 @@ import {
 	isValidSession,
 	revokeAllSessions,
 } from "../session.ts";
-import type { SecretField, SecretRequest } from "../../secrets/store.ts";
-import { saveSecrets, validateAndConsumeMagicToken } from "../../secrets/store.ts";
-import { handleUiRequest, setSecretsDb } from "../serve.ts";
 
 afterEach(() => {
 	revokeAllSessions();
@@ -217,7 +217,6 @@ function createMockDb(request: SecretRequest) {
 		return {};
 	};
 
-	// biome-ignore lint: mock object does not need full type compliance
 	const db = { from: mockFrom } as any;
 	return { db, secretsUpserted };
 }
@@ -368,7 +367,6 @@ function mockSecretsDb(request: SecretRequest) {
 		return {};
 	};
 
-	// biome-ignore lint: mock object
 	const db = { from: mockFrom } as any;
 	setSecretsDb(db);
 	return db;
@@ -555,7 +553,6 @@ function mockSecretsDbWithMagicLink(request: SecretRequest, magicToken: string) 
 		return {};
 	};
 
-	// biome-ignore lint: mock object
 	const db = { from: mockFrom } as any;
 	setSecretsDb(db);
 	return { db, isConsumed: () => consumed };
@@ -567,9 +564,7 @@ describe("magic-link ?magic= exchange + replay (HTTP-level)", () => {
 		const request = createMockSecretRequest({ requestId: "sec_magic01" });
 		mockSecretsDbWithMagicLink(request, magicToken);
 
-		const res = await handleUiRequest(
-			httpReq(`/ui/secrets/sec_magic01?magic=${magicToken}`),
-		);
+		const res = await handleUiRequest(httpReq(`/ui/secrets/sec_magic01?magic=${magicToken}`));
 
 		expect(res.status).toBe(200);
 		const cookie = res.headers.get("Set-Cookie");
@@ -593,17 +588,13 @@ describe("magic-link ?magic= exchange + replay (HTTP-level)", () => {
 		const { isConsumed } = mockSecretsDbWithMagicLink(request, magicToken);
 
 		// First request — succeeds
-		const res1 = await handleUiRequest(
-			httpReq(`/ui/secrets/sec_replay01?magic=${magicToken}`),
-		);
+		const res1 = await handleUiRequest(httpReq(`/ui/secrets/sec_replay01?magic=${magicToken}`));
 		expect(res1.status).toBe(200);
 		expect(res1.headers.get("Set-Cookie")).toContain("phantom_session=");
 		expect(isConsumed()).toBe(true);
 
 		// Second request — same token, already consumed
-		const res2 = await handleUiRequest(
-			httpReq(`/ui/secrets/sec_replay01?magic=${magicToken}`),
-		);
+		const res2 = await handleUiRequest(httpReq(`/ui/secrets/sec_replay01?magic=${magicToken}`));
 		// Should fail — no cookie, shows expired/unauthorized page
 		expect(res2.headers.get("Set-Cookie")).toBeNull();
 		expect(res2.status).toBe(401);

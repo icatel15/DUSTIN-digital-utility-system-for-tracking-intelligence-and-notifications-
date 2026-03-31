@@ -63,11 +63,7 @@ function makeMockAudit(): { audit: AuditLogger; entries: CapturedEntry[] } {
 }
 
 /** Helper to POST to /trigger with an optional bearer token. */
-function triggerRequest(
-	port: number,
-	body: Record<string, unknown>,
-	token?: string,
-): Promise<Response> {
+function triggerRequest(port: number, body: Record<string, unknown>, token?: string): Promise<Response> {
 	const headers: Record<string, string> = { "Content-Type": "application/json" };
 	if (token) {
 		headers.Authorization = `Bearer ${token}`;
@@ -99,7 +95,7 @@ describe("POST /trigger authentication", () => {
 		if (savedSecret !== undefined) {
 			process.env.TRIGGER_SECRET = savedSecret;
 		} else {
-			delete process.env.TRIGGER_SECRET;
+			process.env.TRIGGER_SECRET = undefined;
 		}
 		// Reset trigger deps to avoid leaking between tests
 		setTriggerDeps(null as unknown as Parameters<typeof setTriggerDeps>[0]);
@@ -113,7 +109,7 @@ describe("POST /trigger authentication", () => {
 	// 1. TRIGGER_SECRET unset -> 404
 	// -----------------------------------------------------------------------
 	test("returns 404 when TRIGGER_SECRET is unset", async () => {
-		delete process.env.TRIGGER_SECRET;
+		process.env.TRIGGER_SECRET = undefined;
 
 		const runtime = makeMockRuntime();
 		setTriggerDeps({ runtime });
@@ -232,11 +228,7 @@ describe("POST /trigger authentication", () => {
 
 		server = startServer(makeConfig(port), Date.now());
 
-		const res = await triggerRequest(
-			port,
-			{ task: "run diagnostics", source: "cron" },
-			TEST_SECRET,
-		);
+		const res = await triggerRequest(port, { task: "run diagnostics", source: "cron" }, TEST_SECRET);
 
 		expect(res.status).toBe(200);
 		expect(entries).toHaveLength(1);
@@ -295,11 +287,7 @@ describe("POST /trigger authentication", () => {
 
 		const sensitiveTask = "Send the financial report for Q4 with account number 1234-5678";
 
-		const res = await triggerRequest(
-			port,
-			{ task: sensitiveTask, source: "api" },
-			TEST_SECRET,
-		);
+		const res = await triggerRequest(port, { task: sensitiveTask, source: "api" }, TEST_SECRET);
 
 		expect(res.status).toBe(200);
 		expect(entries).toHaveLength(1);
