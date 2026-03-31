@@ -26,9 +26,7 @@ export const SlackChannelConfigSchema = z.object({
 	default_channel_id: z.string().optional(),
 	default_user_id: z.string().optional(),
 	owner_user_id: z.string().optional(),
-	delivery_allowlist: z
-		.array(z.string().regex(/^[CU][A-Z0-9]+$/))
-		.optional(),
+	delivery_allowlist: z.array(z.string().regex(/^[CU][A-Z0-9]+$/)).optional(),
 });
 
 export const TelegramChannelConfigSchema = z.object({

@@ -7,10 +7,7 @@ const testConfig: WebhookChannelConfig = {
 };
 
 /** Build a header-signed request (preferred auth method). */
-function buildSignedRequest(
-	body: Record<string, unknown>,
-	secret: string = testConfig.secret,
-): Request {
+function buildSignedRequest(body: Record<string, unknown>, secret: string = testConfig.secret): Request {
 	const timestamp = String(Date.now());
 	const bodyStr = JSON.stringify(body);
 	const payload = `${timestamp}.${bodyStr}`;
@@ -193,7 +190,9 @@ describe("WebhookChannel", () => {
 			const testChannel = new WebhookChannel(testConfig);
 			await testChannel.connect();
 
-			const callbackUrls = (testChannel as unknown as { callbackUrls: Map<string, { url: string; conversationId: string }> }).callbackUrls;
+			const callbackUrls = (
+				testChannel as unknown as { callbackUrls: Map<string, { url: string; conversationId: string }> }
+			).callbackUrls;
 			const convTasks = (testChannel as unknown as { conversationTasks: Map<string, Set<string>> }).conversationTasks;
 
 			// Set up task routing: taskId -> callback, conversationId -> taskId
@@ -223,10 +222,7 @@ describe("WebhookChannel", () => {
 		const req1 = buildSignedRequest({ message: "first", conversation_id: "same-conv" });
 		const req2 = buildSignedRequest({ message: "second", conversation_id: "same-conv" });
 
-		const [res1, res2] = await Promise.all([
-			channel.handleRequest(req1),
-			channel.handleRequest(req2),
-		]);
+		const [res1, res2] = await Promise.all([channel.handleRequest(req1), channel.handleRequest(req2)]);
 
 		expect(res1.status).toBe(200);
 		expect(res2.status).toBe(200);

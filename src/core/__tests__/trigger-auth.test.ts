@@ -289,11 +289,7 @@ describe("POST /trigger authentication", () => {
 
 		server = startServer(makeConfig(port), Date.now());
 
-		const res = await triggerRequest(
-			port,
-			{ task: "hello", delivery: { target: "C04FORBIDDEN" } },
-			TEST_SECRET,
-		);
+		const res = await triggerRequest(port, { task: "hello", delivery: { target: "C04FORBIDDEN" } }, TEST_SECRET);
 
 		expect(res.status).toBe(403);
 		const json = (await res.json()) as { status: string; message: string };
@@ -319,11 +315,7 @@ describe("POST /trigger authentication", () => {
 
 		server = startServer(makeConfig(port), Date.now());
 
-		const res = await triggerRequest(
-			port,
-			{ task: "hello", delivery: { target: "C04ALLOWED" } },
-			TEST_SECRET,
-		);
+		const res = await triggerRequest(port, { task: "hello", delivery: { target: "C04ALLOWED" } }, TEST_SECRET);
 
 		expect(res.status).toBe(200);
 	});
@@ -342,11 +334,7 @@ describe("POST /trigger authentication", () => {
 
 		server = startServer(makeConfig(port), Date.now());
 
-		const res = await triggerRequest(
-			port,
-			{ task: "hello", delivery: { target: "owner" } },
-			TEST_SECRET,
-		);
+		const res = await triggerRequest(port, { task: "hello", delivery: { target: "owner" } }, TEST_SECRET);
 
 		expect(res.status).toBe(200);
 	});
@@ -362,11 +350,7 @@ describe("POST /trigger authentication", () => {
 
 		server = startServer(makeConfig(port), Date.now());
 
-		const res = await triggerRequest(
-			port,
-			{ task: "hello", delivery: { target: "C04ANYTHING" } },
-			TEST_SECRET,
-		);
+		const res = await triggerRequest(port, { task: "hello", delivery: { target: "C04ANYTHING" } }, TEST_SECRET);
 
 		expect(res.status).toBe(200);
 	});

@@ -242,7 +242,11 @@ async function handleTrigger(req: Request): Promise<Response> {
 	const deliveryTarget = body.delivery?.target ?? "owner";
 
 	// Enforce delivery target allowlist (owner is always permitted)
-	if (deliveryTarget !== "owner" && triggerDeps.deliveryAllowlist && !triggerDeps.deliveryAllowlist.has(deliveryTarget)) {
+	if (
+		deliveryTarget !== "owner" &&
+		triggerDeps.deliveryAllowlist &&
+		!triggerDeps.deliveryAllowlist.has(deliveryTarget)
+	) {
 		if (triggerDeps.audit) {
 			await triggerDeps.audit.log({
 				client_name: "trigger",

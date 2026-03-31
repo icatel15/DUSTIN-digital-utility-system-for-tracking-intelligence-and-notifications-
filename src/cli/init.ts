@@ -303,7 +303,9 @@ export async function runInit(args: string[]): Promise<void> {
 		console.log(`  Operator: ${mcp.operatorToken}`);
 		console.log(`  Read:     ${mcp.readToken}`);
 		console.log("\n  Connect from Claude Code:");
-		console.log(`     claude mcp add phantom -- curl -H "Authorization: Bearer ${mcp.adminToken}" https://your-host/mcp`);
+		console.log(
+			`     claude mcp add phantom -- curl -H "Authorization: Bearer ${mcp.adminToken}" https://your-host/mcp`,
+		);
 	}
 
 	if (slackAnswers.botToken) {
