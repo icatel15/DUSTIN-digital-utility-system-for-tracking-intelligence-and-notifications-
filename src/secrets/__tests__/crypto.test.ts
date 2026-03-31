@@ -115,7 +115,10 @@ describe("encrypt / decrypt round-trip", () => {
 	test("tampered auth tag fails decryption", () => {
 		process.env.SECRET_ENCRYPTION_KEY = TEST_KEY;
 		const { encrypted, iv, authTag } = encryptSecret("sensitive-data");
-		const tampered = `X${authTag.slice(1)}`;
+		// Flip every byte to ensure the tag is fully corrupted
+		const tagBuf = Buffer.from(authTag, "base64");
+		for (let i = 0; i < tagBuf.length; i++) tagBuf[i] ^= 0xff;
+		const tampered = tagBuf.toString("base64");
 		expect(() => decryptSecret(encrypted, iv, tampered)).toThrow();
 	});
 
