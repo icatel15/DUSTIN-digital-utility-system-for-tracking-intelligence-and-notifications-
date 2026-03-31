@@ -1,20 +1,12 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-
-// Mock emitFeedback before importing the module under test
-const mockEmitFeedback = mock(() => {});
-mock.module("../feedback.ts", () => {
-	// Re-export everything from the real module, but override emitFeedback
-	const real = require("../feedback.ts");
-	return {
-		...real,
-		emitFeedback: mockEmitFeedback,
-	};
-});
-
+import { setFeedbackHandler } from "../feedback.ts";
 import { type OwnerChecker, registerSlackActions } from "../slack-actions.ts";
 
 type ActionHandler = (args: Record<string, unknown>) => Promise<void>;
 const actionHandlers = new Map<string, ActionHandler>();
+
+// Capture feedback signals via setFeedbackHandler instead of mock.module
+const feedbackSignals: Array<Record<string, unknown>> = [];
 
 function createMockApp() {
 	const mockChatUpdate = mock(() => Promise.resolve({ ok: true }));
@@ -59,7 +51,10 @@ async function invokeAction(key: string, body: Record<string, unknown>, client: 
 describe("registerSlackActions owner gating", () => {
 	beforeEach(() => {
 		actionHandlers.clear();
-		mockEmitFeedback.mockClear();
+		feedbackSignals.length = 0;
+		setFeedbackHandler((signal) => {
+			feedbackSignals.push(signal as unknown as Record<string, unknown>);
+		});
 	});
 
 	describe("non-owner feedback button clicks are dropped", () => {
@@ -71,7 +66,7 @@ describe("registerSlackActions owner gating", () => {
 			const body = buildFeedbackBody("UOTHER", "phantom:feedback:positive");
 			await invokeAction("phantom:feedback:positive", body, app.client);
 
-			expect(mockEmitFeedback).not.toHaveBeenCalled();
+			expect(feedbackSignals).toHaveLength(0);
 			expect(mockChatUpdate).not.toHaveBeenCalled();
 		});
 
@@ -83,7 +78,7 @@ describe("registerSlackActions owner gating", () => {
 			const body = buildFeedbackBody("UOTHER", "phantom:feedback:negative");
 			await invokeAction("phantom:feedback:negative", body, app.client);
 
-			expect(mockEmitFeedback).not.toHaveBeenCalled();
+			expect(feedbackSignals).toHaveLength(0);
 			expect(mockChatUpdate).not.toHaveBeenCalled();
 		});
 
@@ -95,7 +90,7 @@ describe("registerSlackActions owner gating", () => {
 			const body = buildFeedbackBody("UOTHER", "phantom:feedback:partial");
 			await invokeAction("phantom:feedback:partial", body, app.client);
 
-			expect(mockEmitFeedback).not.toHaveBeenCalled();
+			expect(feedbackSignals).toHaveLength(0);
 			expect(mockChatUpdate).not.toHaveBeenCalled();
 		});
 	});
@@ -111,10 +106,8 @@ describe("registerSlackActions owner gating", () => {
 				"phantom:action:0",
 				JSON.stringify({ label: "Summarize", payload: "do-it" }),
 			);
-			// The regex handler key is the regex source: /^phantom:action:\d+$/
 			await invokeAction("^phantom:action:\\d+$", body, app.client);
 
-			// chat.update should not be called (handler returned early)
 			expect(mockChatUpdate).not.toHaveBeenCalled();
 		});
 	});
@@ -128,9 +121,8 @@ describe("registerSlackActions owner gating", () => {
 			const body = buildFeedbackBody("UOWNER", "phantom:feedback:positive", "msg123");
 			await invokeAction("phantom:feedback:positive", body, app.client);
 
-			expect(mockEmitFeedback).toHaveBeenCalledTimes(1);
-			const call = (mockEmitFeedback.mock.calls as unknown as Array<[Record<string, unknown>]>)[0][0];
-			expect(call).toMatchObject({
+			expect(feedbackSignals).toHaveLength(1);
+			expect(feedbackSignals[0]).toMatchObject({
 				type: "positive",
 				userId: "UOWNER",
 				source: "button",
@@ -170,7 +162,6 @@ describe("registerSlackActions owner gating", () => {
 			const { app } = createMockApp();
 			registerSlackActions(app as any, ownerChecker);
 
-			// Set up a follow-up handler via the exported setter
 			const { setActionFollowUpHandler } = await import("../slack-actions.ts");
 			const mockFollowUp = mock(() => Promise.resolve());
 			setActionFollowUpHandler(mockFollowUp);
@@ -191,7 +182,6 @@ describe("registerSlackActions owner gating", () => {
 				actionPayload: "do-it",
 			});
 
-			// Clean up
 			setActionFollowUpHandler(null as any);
 		});
 	});
@@ -204,7 +194,7 @@ describe("registerSlackActions owner gating", () => {
 			const body = buildFeedbackBody("UANYONE", "phantom:feedback:positive", "msg123");
 			await invokeAction("phantom:feedback:positive", body, app.client);
 
-			expect(mockEmitFeedback).toHaveBeenCalledTimes(1);
+			expect(feedbackSignals).toHaveLength(1);
 			expect(mockChatUpdate).toHaveBeenCalledTimes(1);
 		});
 
@@ -225,9 +215,8 @@ describe("registerSlackActions owner gating", () => {
 			const body = buildFeedbackBody("URANDOM", "phantom:feedback:partial", "msg456");
 			await invokeAction("phantom:feedback:partial", body, app.client);
 
-			expect(mockEmitFeedback).toHaveBeenCalledTimes(1);
-			const call = (mockEmitFeedback.mock.calls as unknown as Array<[Record<string, unknown>]>)[0][0];
-			expect(call).toMatchObject({
+			expect(feedbackSignals).toHaveLength(1);
+			expect(feedbackSignals[0]).toMatchObject({
 				type: "partial",
 				userId: "URANDOM",
 			});
@@ -253,7 +242,6 @@ describe("registerSlackActions owner gating", () => {
 			const body = buildFeedbackBody("UOTHER");
 			const { mockAck } = await invokeAction("phantom:feedback:positive", body, app.client);
 
-			// ack() is called before the owner check to avoid Slack timeouts
 			expect(mockAck).toHaveBeenCalledTimes(1);
 		});
 
@@ -281,7 +269,6 @@ describe("registerSlackActions owner gating", () => {
 			const { app } = createMockApp();
 			registerSlackActions(app as any);
 
-			// The regex /^phantom:action:\d+$/ stores its source as key
 			expect(actionHandlers.has("^phantom:action:\\d+$")).toBe(true);
 		});
 	});
