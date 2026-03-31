@@ -86,7 +86,7 @@ export function createWebUiToolServer(domain: string | undefined, agentName: str
 		{},
 		async () => {
 			try {
-				const { sessionToken, magicToken } = createSession();
+				const { magicToken } = createSession();
 				const loginUrl = baseUrl ? `${baseUrl}/ui/login?magic=${magicToken}` : `/ui/login?magic=${magicToken}`;
 
 				return ok({
