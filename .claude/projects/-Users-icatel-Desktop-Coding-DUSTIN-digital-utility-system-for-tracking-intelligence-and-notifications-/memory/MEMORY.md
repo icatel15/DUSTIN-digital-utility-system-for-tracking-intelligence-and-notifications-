@@ -1,2 +1,3 @@
-- [User Profile](user_profile.md) — Project owner, builds DUSTIN for self and wife, works at J.P. Morgan (excluded), uses Notion daily
-- [DUSTIN Project Status](project_dustin_status.md) — Phase 0 complete, Phase 1 (data layer swap) next, recon shows clean abstractions
+- [User Profile](user_profile.md) — Woody + Tash, household AI assistant, works at J.P. Morgan (excluded), Telegram ID 8669996556
+- [DUSTIN Project Status](project_dustin_status.md) — Live on Hetzner 178.104.134.128, Phases 0-2 done, deploy pipeline next
+- [Debugging Feedback](feedback_debugging.md) — Add verbose debug logging proactively when troubleshooting production issues
