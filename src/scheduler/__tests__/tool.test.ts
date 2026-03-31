@@ -68,7 +68,11 @@ describe("createSchedulerToolServer", () => {
 	});
 
 	test("delete action via scheduler removes a job", async () => {
-		const job = await scheduler.createJob({ name: "Deletable", schedule: { kind: "every", intervalMs: 60_000 }, task: "D" });
+		const job = await scheduler.createJob({
+			name: "Deletable",
+			schedule: { kind: "every", intervalMs: 60_000 },
+			task: "D",
+		});
 
 		const deleted = await scheduler.deleteJob(job.id);
 		expect(deleted).toBe(true);

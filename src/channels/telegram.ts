@@ -94,7 +94,7 @@ export class TelegramChannel implements Channel {
 
 			// launch() starts an infinite polling loop — it never resolves.
 			// Fire and forget, then mark connected once polling is running.
-			this.bot.launch({ dropPendingUpdates: true }).catch((err: unknown) => {
+			(this.bot.launch as (opts?: { dropPendingUpdates?: boolean }) => Promise<void>)({ dropPendingUpdates: true }).catch((err: unknown) => {
 				const msg = err instanceof Error ? err.message : String(err);
 				console.error(`[telegram] Polling error: ${msg}`);
 				this.connectionState = "error";
@@ -254,7 +254,7 @@ export class TelegramChannel implements Channel {
 			if (text.startsWith("/")) return;
 
 			const chatId = ctx.message.chat.id;
-			const chatType = (ctx.message.chat as { type: string }).type ?? "private";
+			const chatType = (ctx.message.chat as unknown as { type: string }).type ?? "private";
 			const from = ctx.message.from;
 			const senderId = String(from?.id ?? "unknown");
 

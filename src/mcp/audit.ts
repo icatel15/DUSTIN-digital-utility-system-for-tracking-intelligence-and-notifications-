@@ -28,11 +28,7 @@ export class AuditLogger {
 	}
 
 	async getRecent(limit = 50): Promise<AuditEntry[]> {
-		const { data } = await this.db
-			.from("mcp_audit")
-			.select("*")
-			.order("id", { ascending: false })
-			.limit(limit);
+		const { data } = await this.db.from("mcp_audit").select("*").order("id", { ascending: false }).limit(limit);
 
 		return (data ?? []) as AuditEntry[];
 	}

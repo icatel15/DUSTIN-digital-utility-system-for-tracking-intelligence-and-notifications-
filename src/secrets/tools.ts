@@ -1,7 +1,7 @@
-import type { SupabaseClient } from "../db/connection.ts";
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import type { McpSdkServerConfigWithInstance } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import type { SupabaseClient } from "../db/connection.ts";
 import { createSecretRequest, getSecret } from "./store.ts";
 
 type SecretToolDeps = {

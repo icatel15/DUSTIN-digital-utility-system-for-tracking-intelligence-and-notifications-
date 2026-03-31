@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createMockSupabase } from "../test-helpers.ts";
 import { runMigrations } from "../migrate.ts";
+import { createMockSupabase } from "../test-helpers.ts";
 
 describe("runMigrations", () => {
 	test("does not throw when given a valid Supabase client", async () => {

@@ -96,7 +96,7 @@ to the current conversation.`,
 					}
 
 					case "delete": {
-						const targetId = input.jobId ?? await findJobIdByName(scheduler, input.name);
+						const targetId = input.jobId ?? (await findJobIdByName(scheduler, input.name));
 						if (!targetId) return err("Provide jobId or name to delete");
 
 						const deleted = await scheduler.deleteJob(targetId);
@@ -104,7 +104,7 @@ to the current conversation.`,
 					}
 
 					case "run": {
-						const targetId = input.jobId ?? await findJobIdByName(scheduler, input.name);
+						const targetId = input.jobId ?? (await findJobIdByName(scheduler, input.name));
 						if (!targetId) return err("Provide jobId or name to run");
 
 						const result = await scheduler.runJobNow(targetId);

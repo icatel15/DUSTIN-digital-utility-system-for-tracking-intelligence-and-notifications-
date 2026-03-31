@@ -40,13 +40,11 @@ export async function ensureUser(
 		return user;
 	}
 
-	const { error: insertError } = await db
-		.from("users")
-		.insert({
-			telegram_user_id: telegramUserId,
-			display_name: displayName ?? null,
-			role,
-		});
+	const { error: insertError } = await db.from("users").insert({
+		telegram_user_id: telegramUserId,
+		display_name: displayName ?? null,
+		role,
+	});
 
 	if (insertError) {
 		throw new Error(`Failed to create user for Telegram ID ${telegramUserId}: ${insertError.message}`);
@@ -110,10 +108,7 @@ export function isAuthorizedUser(
 /**
  * Get the role for an authorized Telegram user.
  */
-export function getUserRole(
-	senderId: string,
-	ownerUserId: string | undefined,
-): UserRole {
+export function getUserRole(senderId: string, ownerUserId: string | undefined): UserRole {
 	return senderId === ownerUserId ? "owner" : "partner";
 }
 

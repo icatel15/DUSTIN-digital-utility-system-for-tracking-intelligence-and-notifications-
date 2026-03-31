@@ -1,5 +1,5 @@
-import type { SupabaseClient } from "../db/connection.ts";
 import type { SlackChannel } from "../channels/slack.ts";
+import type { SupabaseClient } from "../db/connection.ts";
 import type { RoleTemplate } from "../roles/types.ts";
 import { type OwnerProfile, type SlackProfileClient, hasPersonalizationData, profileOwner } from "./profiler.ts";
 import { markOnboardingStarted } from "./state.ts";

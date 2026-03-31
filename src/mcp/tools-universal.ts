@@ -1,9 +1,9 @@
-import type { SupabaseClient } from "../db/connection.ts";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { AgentRuntime } from "../agent/runtime.ts";
 import type { PhantomConfig } from "../config/types.ts";
+import type { SupabaseClient } from "../db/connection.ts";
 import type { EvolutionEngine } from "../evolution/engine.ts";
 import type { MemorySystem } from "../memory/system.ts";
 
@@ -47,10 +47,7 @@ function registerPhantomStatus(server: McpServer, deps: ToolDependencies): void 
 
 			const totalCost = (costData ?? []).reduce((sum, row) => sum + (row.cost_usd ?? 0), 0);
 
-			const { data: queueData } = await deps.db
-				.from("tasks")
-				.select("id")
-				.in("status", ["queued", "active"]);
+			const { data: queueData } = await deps.db.from("tasks").select("id").in("status", ["queued", "active"]);
 
 			const queueDepth = queueData?.length ?? 0;
 
@@ -160,10 +157,7 @@ function registerPhantomMetrics(server: McpServer, deps: ToolDependencies): void
 				dateFilter = "1970-01-01T00:00:00.000Z";
 			}
 
-			const { data: costData } = await deps.db
-				.from("cost_events")
-				.select("cost_usd")
-				.gte("created_at", dateFilter);
+			const { data: costData } = await deps.db.from("cost_events").select("cost_usd").gte("created_at", dateFilter);
 
 			const rows = costData ?? [];
 			const totalCost = rows.reduce((sum, row) => sum + (row.cost_usd ?? 0), 0);
@@ -198,11 +192,17 @@ function registerPhantomHistory(server: McpServer, deps: ToolDependencies): void
 		async ({ limit }): Promise<CallToolResult> => {
 			const { data: sessions } = await deps.db
 				.from("sessions")
-				.select("session_key, sdk_session_id, channel_id, conversation_id, status, total_cost_usd, input_tokens, output_tokens, turn_count, created_at, last_active_at")
+				.select(
+					"session_key, sdk_session_id, channel_id, conversation_id, status, total_cost_usd, input_tokens, output_tokens, turn_count, created_at, last_active_at",
+				)
 				.order("last_active_at", { ascending: false })
 				.limit(limit);
 
-			return { content: [{ type: "text", text: JSON.stringify({ sessions: sessions ?? [], count: (sessions ?? []).length }, null, 2) }] };
+			return {
+				content: [
+					{ type: "text", text: JSON.stringify({ sessions: sessions ?? [], count: (sessions ?? []).length }, null, 2) },
+				],
+			};
 		},
 	);
 }
@@ -311,10 +311,7 @@ function registerPhantomTaskCreate(server: McpServer, deps: ToolDependencies): v
 				status: "queued",
 			});
 
-			const { data: queueData } = await deps.db
-				.from("tasks")
-				.select("id")
-				.eq("status", "queued");
+			const { data: queueData } = await deps.db.from("tasks").select("id").eq("status", "queued");
 
 			return {
 				content: [
@@ -346,11 +343,7 @@ function registerPhantomTaskStatus(server: McpServer, deps: ToolDependencies): v
 			}),
 		},
 		async ({ taskId }): Promise<CallToolResult> => {
-			const { data: task } = await deps.db
-				.from("tasks")
-				.select("*")
-				.eq("id", taskId)
-				.single();
+			const { data: task } = await deps.db.from("tasks").select("*").eq("id", taskId).single();
 
 			if (!task) {
 				return { content: [{ type: "text", text: JSON.stringify({ error: "Task not found" }) }], isError: true };

@@ -72,7 +72,11 @@ export async function runStatus(args: string[]): Promise<void> {
 
 	const channelStr = channelList.length > 0 ? channelList.join(", ") : "none";
 	const memoryStr =
-		data.memory.qdrant && data.memory.embeddings ? "ok" : data.memory.qdrant || data.memory.embeddings ? "degraded" : "offline";
+		data.memory.qdrant && data.memory.embeddings
+			? "ok"
+			: data.memory.qdrant || data.memory.embeddings
+				? "degraded"
+				: "offline";
 
 	console.log(
 		`${data.agent} | ${data.role.name} | v${data.version} | ` +

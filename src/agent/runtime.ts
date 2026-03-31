@@ -1,7 +1,7 @@
-import type { SupabaseClient } from "../db/connection.ts";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import type { PhantomConfig } from "../config/types.ts";
+import type { SupabaseClient } from "../db/connection.ts";
 import type { EvolvedConfig } from "../evolution/types.ts";
 import type { MemoryContextBuilder } from "../memory/context-builder.ts";
 import type { RoleTemplate } from "../roles/types.ts";
@@ -160,7 +160,7 @@ export class AgentRuntime {
 			});
 
 			for await (const message of queryStream) {
-					switch (message.type) {
+				switch (message.type) {
 					case "system": {
 						if (message.subtype === "init") {
 							sdkSessionId = message.session_id;

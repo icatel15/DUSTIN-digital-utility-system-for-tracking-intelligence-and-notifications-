@@ -1,5 +1,5 @@
-import type { SupabaseClient } from "../db/connection.ts";
 import { relative, resolve } from "node:path";
+import type { SupabaseClient } from "../db/connection.ts";
 import { createSSEResponse } from "./events.ts";
 import { loginPageHtml } from "./login-page.ts";
 import { consumeMagicLink, createSession, isValidSession } from "./session.ts";
@@ -263,7 +263,7 @@ async function handleLoginPost(req: Request): Promise<Response> {
 		return new Response(JSON.stringify({ ok: true }), {
 			headers: {
 				"Content-Type": "application/json",
-				"Set-Cookie": buildSetCookieHeader(sessionToken),
+				"Set-Cookie": buildSetCookieHeader(body.token),
 			},
 		});
 	}

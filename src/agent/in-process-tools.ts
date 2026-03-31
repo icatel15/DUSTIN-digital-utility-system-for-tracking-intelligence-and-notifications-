@@ -28,7 +28,7 @@ export function createInProcessToolServer(registry: DynamicToolRegistry): McpSdk
 		},
 		async (input) => {
 			try {
-				const def = registry.register(input);
+				const def = await registry.register(input);
 				return {
 					content: [
 						{
@@ -73,7 +73,7 @@ export function createInProcessToolServer(registry: DynamicToolRegistry): McpSdk
 				};
 			}
 
-			const removed = registry.unregister(name);
+			const removed = await registry.unregister(name);
 			return {
 				content: [
 					{

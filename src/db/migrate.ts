@@ -12,8 +12,7 @@ export async function runMigrations(db: SupabaseClient): Promise<void> {
 	const { error } = await db.from("sessions").select("id").limit(0);
 	if (error) {
 		throw new Error(
-			`Supabase connectivity check failed: ${error.message}. ` +
-				"Ensure SUPABASE_URL and SUPABASE_SERVICE_KEY are correct and migrations have been applied.",
+			`Supabase connectivity check failed: ${error.message}. Ensure SUPABASE_URL and SUPABASE_SERVICE_KEY are correct and migrations have been applied.`,
 		);
 	}
 }

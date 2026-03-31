@@ -1,7 +1,7 @@
-import type { SupabaseClient } from "../db/connection.ts";
 import { type McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 import type { PhantomConfig } from "../config/types.ts";
+import type { SupabaseClient } from "../db/connection.ts";
 import type { EvolutionEngine } from "../evolution/engine.ts";
 import type { MemorySystem } from "../memory/system.ts";
 
@@ -199,7 +199,9 @@ function registerTasksCompletedResource(server: McpServer, deps: ResourceDepende
 				.order("completed_at", { ascending: false })
 				.limit(50);
 
-			return { contents: [{ uri: "phantom://tasks/completed", text: JSON.stringify({ tasks: tasks ?? [] }, null, 2) }] };
+			return {
+				contents: [{ uri: "phantom://tasks/completed", text: JSON.stringify({ tasks: tasks ?? [] }, null, 2) }],
+			};
 		},
 	);
 }
@@ -276,10 +278,7 @@ function registerMetricsCostResource(server: McpServer, deps: ResourceDependenci
 				dateFilter = d.toISOString();
 			}
 
-			const { data: costData } = await deps.db
-				.from("cost_events")
-				.select("cost_usd")
-				.gte("created_at", dateFilter);
+			const { data: costData } = await deps.db.from("cost_events").select("cost_usd").gte("created_at", dateFilter);
 
 			const rows = costData ?? [];
 			const total = rows.reduce((sum, row) => sum + (row.cost_usd ?? 0), 0);

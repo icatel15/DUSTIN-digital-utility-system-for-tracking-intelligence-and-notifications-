@@ -51,7 +51,12 @@ describe("SemanticStore", () => {
 			const urlStr = typeof url === "string" ? url : url.url;
 
 			if (urlStr.includes("/v1/embeddings")) {
-				return Promise.resolve(new Response(JSON.stringify({ data: [{ embedding: vec, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }), { status: 200 }));
+				return Promise.resolve(
+					new Response(
+						JSON.stringify({ data: [{ embedding: vec, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }),
+						{ status: 200 },
+					),
+				);
 			}
 
 			// Contradiction search returns no results
@@ -92,7 +97,12 @@ describe("SemanticStore", () => {
 			const urlStr = typeof url === "string" ? url : url.url;
 
 			if (urlStr.includes("/v1/embeddings")) {
-				return Promise.resolve(new Response(JSON.stringify({ data: [{ embedding: vec, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }), { status: 200 }));
+				return Promise.resolve(
+					new Response(
+						JSON.stringify({ data: [{ embedding: vec, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }),
+						{ status: 200 },
+					),
+				);
 			}
 
 			if (urlStr.includes("/points/query")) {
@@ -152,7 +162,12 @@ describe("SemanticStore", () => {
 			const urlStr = typeof url === "string" ? url : url.url;
 
 			if (urlStr.includes("/v1/embeddings")) {
-				return Promise.resolve(new Response(JSON.stringify({ data: [{ embedding: vec, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }), { status: 200 }));
+				return Promise.resolve(
+					new Response(
+						JSON.stringify({ data: [{ embedding: vec, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }),
+						{ status: 200 },
+					),
+				);
 			}
 
 			if (urlStr.includes("/points/query")) {
@@ -203,7 +218,12 @@ describe("SemanticStore", () => {
 			const urlStr = typeof url === "string" ? url : url.url;
 
 			if (urlStr.includes("/v1/embeddings")) {
-				return Promise.resolve(new Response(JSON.stringify({ data: [{ embedding: vec, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }), { status: 200 }));
+				return Promise.resolve(
+					new Response(
+						JSON.stringify({ data: [{ embedding: vec, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }),
+						{ status: 200 },
+					),
+				);
 			}
 
 			if (urlStr.includes("/points/query")) {

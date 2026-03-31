@@ -39,14 +39,12 @@ class MockQueryBuilder {
 	private rows: TableStore;
 	private nextId: () => number;
 	private filters: Array<(row: Row) => boolean> = [];
-	private selectedColumns: string | null = null;
 	private orderCol: string | null = null;
 	private orderAsc = true;
 	private limitCount: number | null = null;
 	private isSingle = false;
 	private isMaybeSingle = false;
 	private isHead = false;
-	private isCount = false;
 	private pendingOp: "select" | "insert" | "update" | "delete" | "upsert" | null = null;
 	private pendingData: Row | Row[] | null = null;
 	private upsertConflict: string | null = null;
@@ -57,16 +55,16 @@ class MockQueryBuilder {
 		this.nextId = nextId;
 	}
 
-	select(columns?: string, opts?: { count?: string; head?: boolean }) {
+	select(_columns?: string, opts?: { count?: string; head?: boolean }) {
 		// If select() is chained after delete/update, it acts as a RETURNING clause
 		if (this.pendingOp === "delete" || this.pendingOp === "update") {
 			this.returningSelect = true;
 		} else {
 			this.pendingOp = "select";
 		}
-		this.selectedColumns = columns ?? "*";
+		// columns captured for API compatibility
 		if (opts?.head) this.isHead = true;
-		if (opts?.count) this.isCount = true;
+		// count option captured for API compatibility
 		return this;
 	}
 

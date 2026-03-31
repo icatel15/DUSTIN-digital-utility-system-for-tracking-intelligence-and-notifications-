@@ -618,7 +618,7 @@ async function main(): Promise<void> {
 	// wake the agent in the original Slack thread so it can respond naturally.
 	// This follows the scheduler pattern: route a synthetic message through the runtime.
 	setSecretSavedCallback(async (requestId, secretNames) => {
-		const request = getSecretRequest(db, requestId);
+		const request = await getSecretRequest(db, requestId);
 		if (!request?.notifyChannelId || !request.notifyThread) return;
 
 		const conversationId = `slack:${request.notifyChannelId}:${request.notifyThread}`;

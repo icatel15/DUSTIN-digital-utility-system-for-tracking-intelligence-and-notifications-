@@ -1,7 +1,7 @@
-import type { SupabaseClient } from "../db/connection.ts";
 import { randomUUID } from "node:crypto";
 import type { AgentRuntime } from "../agent/runtime.ts";
 import type { SlackChannel } from "../channels/slack.ts";
+import type { SupabaseClient } from "../db/connection.ts";
 import { computeBackoffNextRun, computeNextRunAt, parseScheduleValue, serializeScheduleValue } from "./schedule.ts";
 import type { JobCreateInput, JobRow, ScheduledJob } from "./types.ts";
 
@@ -99,11 +99,7 @@ export class Scheduler {
 	}
 
 	async deleteJob(id: string): Promise<boolean> {
-		const { data } = await this.db
-			.from("scheduled_jobs")
-			.delete()
-			.eq("id", id)
-			.select("id");
+		const { data } = await this.db.from("scheduled_jobs").delete().eq("id", id).select("id");
 
 		if (data && data.length > 0) {
 			await this.armTimer();
@@ -113,21 +109,14 @@ export class Scheduler {
 	}
 
 	async listJobs(): Promise<ScheduledJob[]> {
-		const { data } = await this.db
-			.from("scheduled_jobs")
-			.select("*")
-			.order("created_at", { ascending: false });
+		const { data } = await this.db.from("scheduled_jobs").select("*").order("created_at", { ascending: false });
 
 		const rows = (data ?? []) as JobRow[];
 		return rows.map(rowToJob);
 	}
 
 	async getJob(id: string): Promise<ScheduledJob | null> {
-		const { data } = await this.db
-			.from("scheduled_jobs")
-			.select("*")
-			.eq("id", id)
-			.maybeSingle();
+		const { data } = await this.db.from("scheduled_jobs").select("*").eq("id", id).maybeSingle();
 
 		return data ? rowToJob(data as JobRow) : null;
 	}

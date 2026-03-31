@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createMockSupabase } from "../../db/test-helpers.ts";
 import { DynamicToolRegistry } from "../../mcp/dynamic-tools.ts";
 import { createInProcessToolServer } from "../in-process-tools.ts";

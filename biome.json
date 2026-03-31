@@ -26,6 +26,22 @@
       "semicolons": "always"
     }
   },
+  "overrides": [
+    {
+      "include": ["**/__tests__/**", "**/*.test.ts", "**/test-helpers.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noThenProperty": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    }
+  ],
   "files": {
     "ignore": ["node_modules", "dist", "*.json"]
   }

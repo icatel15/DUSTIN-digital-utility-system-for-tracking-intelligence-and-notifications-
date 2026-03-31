@@ -38,7 +38,14 @@ describe("createSecretRequest", () => {
 	});
 
 	test("stores request in database", async () => {
-		const { requestId } = await createSecretRequest(db as any, testFields, "Access GitLab", "slack", "C123", "1234.5678");
+		const { requestId } = await createSecretRequest(
+			db as any,
+			testFields,
+			"Access GitLab",
+			"slack",
+			"C123",
+			"1234.5678",
+		);
 		const request = await getSecretRequest(db as any, requestId);
 		expect(request).not.toBeNull();
 		expect(request?.purpose).toBe("Access GitLab");
@@ -94,7 +101,10 @@ describe("validateMagicToken", () => {
 describe("saveSecrets", () => {
 	test("encrypts and stores secrets", async () => {
 		const { requestId } = await createSecretRequest(db as any, testFields, "Test", null, null, null);
-		const { saved } = await saveSecrets(db as any, requestId, { gitlab_token: "glpat-abc123", gitlab_url: "https://gitlab.com" });
+		const { saved } = await saveSecrets(db as any, requestId, {
+			gitlab_token: "glpat-abc123",
+			gitlab_url: "https://gitlab.com",
+		});
 		expect(saved).toContain("gitlab_token");
 		expect(saved).toContain("gitlab_url");
 	});

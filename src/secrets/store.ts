@@ -1,5 +1,5 @@
-import type { SupabaseClient } from "../db/connection.ts";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import type { SupabaseClient } from "../db/connection.ts";
 import { decryptSecret, encryptSecret } from "./crypto.ts";
 
 export type SecretField = {
@@ -91,11 +91,7 @@ export async function createSecretRequest(
 }
 
 export async function getSecretRequest(db: SupabaseClient, requestId: string): Promise<SecretRequest | null> {
-	const { data, error } = await db
-		.from("secret_requests")
-		.select("*")
-		.eq("request_id", requestId)
-		.single();
+	const { data, error } = await db.from("secret_requests").select("*").eq("request_id", requestId).single();
 
 	if (error || !data) return null;
 	return rowToRequest(data as SecretRequestRow);
@@ -183,11 +179,7 @@ function rowToRequest(row: SecretRequestRow): SecretRequest {
 }
 
 export async function getSecret(db: SupabaseClient, name: string): Promise<{ value: string; storedAt: string } | null> {
-	const { data, error } = await db
-		.from("secrets")
-		.select("*")
-		.eq("name", name)
-		.single();
+	const { data, error } = await db.from("secrets").select("*").eq("name", name).single();
 
 	if (error || !data) return null;
 	const row = data as SecretRow;

@@ -26,10 +26,13 @@ describe("EmbeddingClient", () => {
 
 		globalThis.fetch = mock(() =>
 			Promise.resolve(
-				new Response(JSON.stringify({ data: [{ embedding: mockVector, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				}),
+				new Response(
+					JSON.stringify({ data: [{ embedding: mockVector, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }),
+					{
+						status: 200,
+						headers: { "Content-Type": "application/json" },
+					},
+				),
 			),
 		) as unknown as typeof fetch;
 
@@ -69,10 +72,19 @@ describe("EmbeddingClient", () => {
 
 		globalThis.fetch = mock(() =>
 			Promise.resolve(
-				new Response(JSON.stringify({ data: [{ embedding: vec2, index: 1 }, { embedding: vec1, index: 0 }], usage: { prompt_tokens: 10, total_tokens: 10 } }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				}),
+				new Response(
+					JSON.stringify({
+						data: [
+							{ embedding: vec2, index: 1 },
+							{ embedding: vec1, index: 0 },
+						],
+						usage: { prompt_tokens: 10, total_tokens: 10 },
+					}),
+					{
+						status: 200,
+						headers: { "Content-Type": "application/json" },
+					},
+				),
 			),
 		) as unknown as typeof fetch;
 
@@ -89,10 +101,13 @@ describe("EmbeddingClient", () => {
 
 		globalThis.fetch = mock(() =>
 			Promise.resolve(
-				new Response(JSON.stringify({ data: [{ embedding: vec1, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				}),
+				new Response(
+					JSON.stringify({ data: [{ embedding: vec1, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }),
+					{
+						status: 200,
+						headers: { "Content-Type": "application/json" },
+					},
+				),
 			),
 		) as unknown as typeof fetch;
 

@@ -1,7 +1,7 @@
-import type { SupabaseClient } from "../db/connection.ts";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import type { SupabaseClient } from "../db/connection.ts";
 import { executeDynamicHandler } from "./dynamic-handlers.ts";
 
 export type DynamicToolRow = {

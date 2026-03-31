@@ -54,7 +54,11 @@ describe("phantom init", () => {
 	});
 
 	test("phantom.yaml has correct defaults", async () => {
-		const saved = { PHANTOM_NAME: process.env.PHANTOM_NAME, PHANTOM_ROLE: process.env.PHANTOM_ROLE, PHANTOM_MODEL: process.env.PHANTOM_MODEL };
+		const saved = {
+			PHANTOM_NAME: process.env.PHANTOM_NAME,
+			PHANTOM_ROLE: process.env.PHANTOM_ROLE,
+			PHANTOM_MODEL: process.env.PHANTOM_MODEL,
+		};
 		process.env.PHANTOM_NAME = undefined;
 		process.env.PHANTOM_ROLE = undefined;
 		process.env.PHANTOM_MODEL = undefined;

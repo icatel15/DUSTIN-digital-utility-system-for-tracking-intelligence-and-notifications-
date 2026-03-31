@@ -1,6 +1,6 @@
-import type { SupabaseClient } from "../db/connection.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { SupabaseClient } from "../db/connection.ts";
 
 /**
  * True when phantom-config/meta/version.json shows generation 0.

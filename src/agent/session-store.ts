@@ -80,10 +80,7 @@ export class SessionStore {
 
 	async clearSdkSessionId(sessionKey: string): Promise<void> {
 		const now = new Date().toISOString();
-		await this.db
-			.from("sessions")
-			.update({ sdk_session_id: null, last_active_at: now })
-			.eq("session_key", sessionKey);
+		await this.db.from("sessions").update({ sdk_session_id: null, last_active_at: now }).eq("session_key", sessionKey);
 	}
 
 	async touch(sessionKey: string): Promise<void> {

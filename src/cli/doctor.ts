@@ -50,7 +50,12 @@ async function checkQdrant(): Promise<CheckResult> {
 			const isCloud = url.includes("cloud.qdrant.io");
 			return { name: "Qdrant", status: "ok", message: `Healthy${isCloud ? " (Cloud)" : ""} at ${url}` };
 		}
-		return { name: "Qdrant", status: "fail", message: `HTTP ${resp.status} at ${url}`, fix: "Check QDRANT_URL and QDRANT_API_KEY" };
+		return {
+			name: "Qdrant",
+			status: "fail",
+			message: `HTTP ${resp.status} at ${url}`,
+			fix: "Check QDRANT_URL and QDRANT_API_KEY",
+		};
 	} catch {
 		return {
 			name: "Qdrant",
@@ -130,7 +135,12 @@ async function checkDatabase(): Promise<CheckResult> {
 		const db = getDatabase();
 		const { count, error } = await db.from("sessions").select("*", { count: "exact", head: true });
 		if (error) {
-			return { name: "Supabase", status: "fail", message: error.message, fix: "Check Supabase connection and run migrations" };
+			return {
+				name: "Supabase",
+				status: "fail",
+				message: error.message,
+				fix: "Check Supabase connection and run migrations",
+			};
 		}
 		return { name: "Supabase", status: "ok", message: `Connected (${count ?? 0} sessions)` };
 	} catch (err: unknown) {

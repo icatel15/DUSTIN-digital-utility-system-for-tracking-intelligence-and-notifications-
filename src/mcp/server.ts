@@ -1,7 +1,7 @@
-import type { SupabaseClient } from "../db/connection.ts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AgentRuntime } from "../agent/runtime.ts";
 import type { PhantomConfig } from "../config/types.ts";
+import type { SupabaseClient } from "../db/connection.ts";
 import type { EvolutionEngine } from "../evolution/engine.ts";
 import type { MemorySystem } from "../memory/system.ts";
 import { AuditLogger } from "./audit.ts";
