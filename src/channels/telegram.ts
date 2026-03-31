@@ -4,6 +4,8 @@
  * MarkdownV2 formatting, and command handling.
  */
 
+import type { SupabaseClient } from "../db/connection.ts";
+import { type ChatContext, determineChatContext, ensureUser, getUserRole, isAuthorizedUser } from "./telegram-users.ts";
 import type { Channel, ChannelCapabilities, InboundMessage, OutboundMessage, SentMessage } from "./types.ts";
 
 type TelegrafBot = {
@@ -49,6 +51,9 @@ type TelegrafContext = {
 
 export type TelegramChannelConfig = {
 	botToken: string;
+	ownerUserId?: string;
+	partnerUserId?: string;
+	db?: SupabaseClient;
 };
 
 type ConnectionState = "disconnected" | "connecting" | "connected" | "error";
@@ -202,14 +207,23 @@ export class TelegramChannel implements Channel {
 		if (!this.bot) return;
 
 		this.bot.command("start", async (ctx) => {
-			await ctx.reply("Hello! I'm Phantom, your AI co-worker. Send me a message to get started.");
+			const senderId = String(ctx.from?.id ?? "unknown");
+			if (!isAuthorizedUser(senderId, this.config.ownerUserId, this.config.partnerUserId)) {
+				await ctx.reply("Sorry, I'm a private assistant and can only chat with my authorized users.");
+				return;
+			}
+			await ctx.reply("Hello! I'm DUSTIN, your AI co-worker. Send me a message to get started.");
 		});
 
 		this.bot.command("status", async (ctx) => {
-			await ctx.reply("Phantom is running and ready to help.");
+			const senderId = String(ctx.from?.id ?? "unknown");
+			if (!isAuthorizedUser(senderId, this.config.ownerUserId, this.config.partnerUserId)) return;
+			await ctx.reply("DUSTIN is running and ready to help.");
 		});
 
 		this.bot.command("help", async (ctx) => {
+			const senderId = String(ctx.from?.id ?? "unknown");
+			if (!isAuthorizedUser(senderId, this.config.ownerUserId, this.config.partnerUserId)) return;
 			await ctx.reply(
 				"Send me any message and I'll help you out.\n\nCommands:\n/start - Introduction\n/status - Check status\n/help - Show this message",
 			);
@@ -223,20 +237,55 @@ export class TelegramChannel implements Channel {
 			if (text.startsWith("/")) return;
 
 			const chatId = ctx.message.chat.id;
+			const chatType = (ctx.message.chat as { type: string }).type ?? "private";
 			const from = ctx.message.from;
+			const senderId = String(from?.id ?? "unknown");
+
+			// User filtering
+			if (!isAuthorizedUser(senderId, this.config.ownerUserId, this.config.partnerUserId)) {
+				if (chatType === "private") {
+					await ctx.reply("Sorry, I'm a private assistant and can only chat with my authorized users.");
+					console.log(`[telegram] Rejected DM from unauthorized user: ${senderId}`);
+				} else {
+					console.log(`[telegram] Ignoring group message from unauthorized user: ${senderId}`);
+				}
+				return;
+			}
+
+			// Chat context detection
+			const chatContext: ChatContext = determineChatContext(
+				chatType,
+				senderId,
+				this.config.ownerUserId,
+				this.config.partnerUserId,
+			);
+
+			// Ensure user record exists in Supabase
+			if (this.config.db) {
+				try {
+					const role = getUserRole(senderId, this.config.ownerUserId);
+					await ensureUser(this.config.db, senderId, from?.first_name ?? from?.username, role);
+				} catch (err: unknown) {
+					const msg = err instanceof Error ? err.message : String(err);
+					console.warn(`[telegram] Failed to ensure user record: ${msg}`);
+				}
+			}
+
 			const conversationId = `telegram:${chatId}`;
 
 			const inbound: InboundMessage = {
 				id: String(ctx.message.message_id),
 				channelId: this.id,
 				conversationId,
-				senderId: String(from?.id ?? "unknown"),
+				senderId,
 				senderName: from?.first_name ?? from?.username,
 				text,
 				timestamp: new Date(),
 				metadata: {
 					telegramChatId: chatId,
 					telegramMessageId: ctx.message.message_id,
+					chatContext,
+					userId: senderId,
 				},
 			};
 
@@ -261,13 +310,25 @@ export class TelegramChannel implements Channel {
 			if (!chatId) return;
 
 			const from = ctx.from;
+			const senderId = String(from?.id ?? "unknown");
+
+			if (!isAuthorizedUser(senderId, this.config.ownerUserId, this.config.partnerUserId)) return;
+
+			const chatType = (ctx.callbackQuery?.message?.chat as { type?: string })?.type ?? "private";
+			const chatContext: ChatContext = determineChatContext(
+				chatType,
+				senderId,
+				this.config.ownerUserId,
+				this.config.partnerUserId,
+			);
+
 			const conversationId = `telegram:${chatId}`;
 
 			const inbound: InboundMessage = {
 				id: `cb_${Date.now()}`,
 				channelId: this.id,
 				conversationId,
-				senderId: String(from?.id ?? "unknown"),
+				senderId,
 				senderName: from?.first_name ?? from?.username,
 				text: data,
 				timestamp: new Date(),
@@ -275,6 +336,8 @@ export class TelegramChannel implements Channel {
 					telegramChatId: chatId,
 					source: "callback_query",
 					callbackData: data,
+					chatContext,
+					userId: senderId,
 				},
 			};
 

@@ -15,8 +15,26 @@ function cleanup(): void {
 	rmSync(TEST_DIR, { recursive: true, force: true });
 }
 
+function clearPhantomEnv() {
+	const saved = {
+		PHANTOM_NAME: process.env.PHANTOM_NAME,
+		PHANTOM_ROLE: process.env.PHANTOM_ROLE,
+		PHANTOM_MODEL: process.env.PHANTOM_MODEL,
+	};
+	process.env.PHANTOM_NAME = undefined;
+	process.env.PHANTOM_ROLE = undefined;
+	process.env.PHANTOM_MODEL = undefined;
+	return saved;
+}
+function restorePhantomEnv(saved: Record<string, string | undefined>) {
+	for (const [k, v] of Object.entries(saved)) {
+		process.env[k] = v;
+	}
+}
+
 describe("loadConfig", () => {
 	test("loads a valid config file", () => {
+		const saved = clearPhantomEnv();
 		const path = writeYaml(
 			"valid.yaml",
 			`
@@ -37,11 +55,13 @@ max_budget_usd: 25
 			expect(config.effort).toBe("high");
 			expect(config.max_budget_usd).toBe(25);
 		} finally {
+			restorePhantomEnv(saved);
 			cleanup();
 		}
 	});
 
 	test("applies defaults for optional fields", () => {
+		const saved = clearPhantomEnv();
 		const path = writeYaml(
 			"minimal.yaml",
 			`
@@ -56,6 +76,7 @@ name: minimal
 			expect(config.effort).toBe("max");
 			expect(config.max_budget_usd).toBe(0);
 		} finally {
+			restorePhantomEnv(saved);
 			cleanup();
 		}
 	});

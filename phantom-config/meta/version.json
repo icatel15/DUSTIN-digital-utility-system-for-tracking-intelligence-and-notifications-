@@ -1,11 +1,39 @@
 {
-  "version": 0,
-  "parent": null,
-  "timestamp": "2026-03-25T00:00:00Z",
-  "changes": [],
+  "version": 5,
+  "parent": 4,
+  "timestamp": "2026-03-31T11:42:56.802Z",
+  "changes": [
+    {
+      "file": "user-profile.md",
+      "type": "append",
+      "content": "- User explicitly wanted to understand the agent's capabilities and limitations in the current environment.",
+      "rationale": "User preference in session 1c423acd-10e9-4c69-af72-36ba8f4ab120: \"User explicitly wanted to understand the agent's capabilities and limitations in the current environ\"",
+      "session_ids": [
+        "1c423acd-10e9-4c69-af72-36ba8f4ab120"
+      ]
+    },
+    {
+      "file": "user-profile.md",
+      "type": "append",
+      "content": "- User is interested in the agent's deployment architecture and cloud vs. local distinction.",
+      "rationale": "User preference in session 1c423acd-10e9-4c69-af72-36ba8f4ab120: \"User is interested in the agent's deployment architecture and cloud vs. local distinction.\"",
+      "session_ids": [
+        "1c423acd-10e9-4c69-af72-36ba8f4ab120"
+      ]
+    },
+    {
+      "file": "user-profile.md",
+      "type": "append",
+      "content": "- User prefers the agent to cite or explain the source of context-derived information proactively.",
+      "rationale": "User preference in session 1c423acd-10e9-4c69-af72-36ba8f4ab120: \"User prefers the agent to cite or explain the source of context-derived information proactively.\"",
+      "session_ids": [
+        "1c423acd-10e9-4c69-af72-36ba8f4ab120"
+      ]
+    }
+  ],
   "metrics_at_change": {
-    "session_count": 0,
-    "success_rate_7d": 0,
-    "correction_rate_7d": 0
+    "session_count": 6,
+    "success_rate_7d": 1,
+    "correction_rate_7d": 0.67
   }
 }

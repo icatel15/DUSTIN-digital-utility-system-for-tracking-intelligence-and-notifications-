@@ -31,6 +31,8 @@ export const SlackChannelConfigSchema = z.object({
 export const TelegramChannelConfigSchema = z.object({
 	enabled: z.boolean().default(false),
 	bot_token: z.string().min(1),
+	owner_user_id: z.string().optional(),
+	partner_user_id: z.string().optional(),
 });
 
 export const EmailChannelConfigSchema = z.object({

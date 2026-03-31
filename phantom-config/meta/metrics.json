@@ -1,13 +1,51 @@
 {
-  "session_count": 2,
-  "success_count": 2,
+  "session_count": 6,
+  "success_count": 6,
   "failure_count": 0,
-  "correction_count": 0,
-  "evolution_count": 0,
+  "correction_count": 4,
+  "evolution_count": 5,
   "rollback_count": 0,
-  "last_session_at": "2026-03-31T11:35:43.637Z",
-  "last_evolution_at": null,
+  "last_session_at": "2026-03-31T11:40:21.984Z",
+  "last_evolution_at": "2026-03-31T11:42:56.803Z",
   "success_rate_7d": 1,
-  "correction_rate_7d": 0,
-  "sessions_since_consolidation": 2
+  "correction_rate_7d": 0.67,
+  "sessions_since_consolidation": 6,
+  "judge_costs": {
+    "observation_extraction": {
+      "calls": 5,
+      "totalUsd": 0.12448799999999999,
+      "totalInputTokens": 12216,
+      "totalOutputTokens": 5856
+    },
+    "safety_gate": {
+      "calls": 13,
+      "totalUsd": 0.5445329999999999,
+      "totalInputTokens": 80616,
+      "totalOutputTokens": 20179
+    },
+    "constitution_gate": {
+      "calls": 13,
+      "totalUsd": 0.521925,
+      "totalInputTokens": 59985,
+      "totalOutputTokens": 22798
+    },
+    "regression_gate": {
+      "calls": 13,
+      "totalUsd": 0.09871400000000001,
+      "totalInputTokens": 0,
+      "totalOutputTokens": 0
+    },
+    "consolidation": {
+      "calls": 0,
+      "totalUsd": 0,
+      "totalInputTokens": 0,
+      "totalOutputTokens": 0
+    },
+    "quality_assessment": {
+      "calls": 5,
+      "totalUsd": 0.127845,
+      "totalInputTokens": 11710,
+      "totalOutputTokens": 6181
+    }
+  }
 }

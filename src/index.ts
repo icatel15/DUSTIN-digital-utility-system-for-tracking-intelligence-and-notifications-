@@ -267,11 +267,17 @@ async function main(): Promise<void> {
 	// Register Telegram channel
 	let telegramChannel: TelegramChannel | null = null;
 	if (channelsConfig?.telegram?.enabled && channelsConfig.telegram.bot_token) {
+		const ownerTelegramId = channelsConfig.telegram.owner_user_id ?? process.env.OWNER_TELEGRAM_USER_ID;
+		const partnerTelegramId = channelsConfig.telegram.partner_user_id ?? process.env.PARTNER_TELEGRAM_USER_ID;
 		telegramChannel = new TelegramChannel({
 			botToken: channelsConfig.telegram.bot_token,
+			ownerUserId: ownerTelegramId,
+			partnerUserId: partnerTelegramId,
+			db,
 		});
 		router.register(telegramChannel);
-		console.log("[phantom] Telegram channel registered");
+		const userMode = ownerTelegramId ? "two-user mode" : "open mode (no user filtering)";
+		console.log(`[phantom] Telegram channel registered (${userMode})`);
 	}
 
 	// Register Email channel

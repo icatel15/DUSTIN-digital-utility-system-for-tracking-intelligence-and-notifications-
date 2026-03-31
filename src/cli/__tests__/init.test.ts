@@ -54,12 +54,17 @@ describe("phantom init", () => {
 	});
 
 	test("phantom.yaml has correct defaults", async () => {
+		const saved = { PHANTOM_NAME: process.env.PHANTOM_NAME, PHANTOM_ROLE: process.env.PHANTOM_ROLE, PHANTOM_MODEL: process.env.PHANTOM_MODEL };
+		process.env.PHANTOM_NAME = undefined;
+		process.env.PHANTOM_ROLE = undefined;
+		process.env.PHANTOM_MODEL = undefined;
 		const { runInit } = await import("../init.ts");
 		await runInit(["--yes"]);
 
 		const raw = readFileSync("config/phantom.yaml", "utf-8");
 		const config = YAML.parse(raw);
 		expect(config.name).toBe("phantom");
+		Object.assign(process.env, saved);
 		expect(config.role).toBe("swe");
 		expect(config.port).toBe(3100);
 		expect(config.model).toBe("claude-sonnet-4-6");
