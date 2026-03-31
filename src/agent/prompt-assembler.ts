@@ -111,6 +111,7 @@ function buildEnvironment(config: PhantomConfig): string {
 
 	lines.push(`- MCP endpoint: ${mcpUrl}`);
 	lines.push(`- Local port: ${config.port}`);
+	lines.push(`- Model: ${config.model}`);
 	lines.push("");
 	lines.push("You have:");
 	lines.push("- Full Bash access (run any command)");
