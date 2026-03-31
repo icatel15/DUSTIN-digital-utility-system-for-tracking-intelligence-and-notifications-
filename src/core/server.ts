@@ -12,7 +12,7 @@ type EvolutionVersionProvider = () => number;
 type McpServerProvider = () => PhantomMcpServer | null;
 type ChannelHealthProvider = () => Record<string, boolean>;
 type RoleInfoProvider = () => { id: string; name: string } | null;
-type OnboardingStatusProvider = () => string;
+type OnboardingStatusProvider = () => string | Promise<string>;
 type WebhookHandler = (req: Request) => Promise<Response>;
 type PeerHealthProvider = () => Record<string, { healthy: boolean; latencyMs: number; error?: string }>;
 type TriggerDeps = {
@@ -76,19 +76,19 @@ export function startServer(config: PhantomConfig, startedAt: number): ReturnTyp
 			if (url.pathname === "/health") {
 				const memory: MemoryHealth = memoryHealthProvider
 					? await memoryHealthProvider()
-					: { qdrant: false, ollama: false, configured: false };
+					: { qdrant: false, embeddings: false, configured: false };
 
 				const channels: Record<string, boolean> = channelHealthProvider ? channelHealthProvider() : {};
 
-				const allHealthy = memory.qdrant && memory.ollama;
-				const someHealthy = memory.qdrant || memory.ollama;
+				const allHealthy = memory.qdrant && memory.embeddings;
+				const someHealthy = memory.qdrant || memory.embeddings;
 				// Both up -> ok. One up -> degraded. Both down + configured -> down. Not configured -> ok.
 				const status = allHealthy ? "ok" : someHealthy ? "degraded" : memory.configured ? "down" : "ok";
 				const evolutionGeneration = evolutionVersionProvider ? evolutionVersionProvider() : 0;
 
 				const roleInfo = roleInfoProvider ? roleInfoProvider() : null;
 
-				const onboardingStatus = onboardingStatusProvider ? onboardingStatusProvider() : null;
+				const onboardingStatus = onboardingStatusProvider ? await onboardingStatusProvider() : null;
 				const peers = peerHealthProvider ? peerHealthProvider() : null;
 
 				return Response.json({

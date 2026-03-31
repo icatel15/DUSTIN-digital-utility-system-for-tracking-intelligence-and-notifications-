@@ -67,7 +67,7 @@ export type JobRow = {
 	id: string;
 	name: string;
 	description: string | null;
-	enabled: number;
+	enabled: boolean;
 	schedule_kind: string;
 	schedule_value: string;
 	task: string;
@@ -81,7 +81,7 @@ export type JobRow = {
 	next_run_at: string | null;
 	run_count: number;
 	consecutive_errors: number;
-	delete_after_run: number;
+	delete_after_run: boolean;
 	created_at: string;
 	created_by: string;
 	updated_at: string;

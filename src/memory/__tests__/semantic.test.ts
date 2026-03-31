@@ -7,9 +7,9 @@ import type { SemanticFact } from "../types.ts";
 
 const TEST_CONFIG: MemoryConfig = {
 	qdrant: { url: "http://localhost:6333" },
-	ollama: { url: "http://localhost:11434", model: "nomic-embed-text" },
+	embeddings: { provider: "openai", api_key: "test-key", model: "text-embedding-3-small" },
 	collections: { episodes: "episodes", semantic_facts: "semantic_facts", procedures: "procedures" },
-	embedding: { dimensions: 768, batch_size: 32 },
+	embedding: { dimensions: 1536, batch_size: 32 },
 	context: { max_tokens: 50000, episode_limit: 10, fact_limit: 20, procedure_limit: 5 },
 };
 
@@ -50,8 +50,8 @@ describe("SemanticStore", () => {
 		globalThis.fetch = mock((url: string | Request, init?: RequestInit) => {
 			const urlStr = typeof url === "string" ? url : url.url;
 
-			if (urlStr.includes("/api/embed")) {
-				return Promise.resolve(new Response(JSON.stringify({ embeddings: [vec] }), { status: 200 }));
+			if (urlStr.includes("/v1/embeddings")) {
+				return Promise.resolve(new Response(JSON.stringify({ data: [{ embedding: vec, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }), { status: 200 }));
 			}
 
 			// Contradiction search returns no results
@@ -91,8 +91,8 @@ describe("SemanticStore", () => {
 		globalThis.fetch = mock((url: string | Request, init?: RequestInit) => {
 			const urlStr = typeof url === "string" ? url : url.url;
 
-			if (urlStr.includes("/api/embed")) {
-				return Promise.resolve(new Response(JSON.stringify({ embeddings: [vec] }), { status: 200 }));
+			if (urlStr.includes("/v1/embeddings")) {
+				return Promise.resolve(new Response(JSON.stringify({ data: [{ embedding: vec, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }), { status: 200 }));
 			}
 
 			if (urlStr.includes("/points/query")) {
@@ -151,8 +151,8 @@ describe("SemanticStore", () => {
 		globalThis.fetch = mock((url: string | Request) => {
 			const urlStr = typeof url === "string" ? url : url.url;
 
-			if (urlStr.includes("/api/embed")) {
-				return Promise.resolve(new Response(JSON.stringify({ embeddings: [vec] }), { status: 200 }));
+			if (urlStr.includes("/v1/embeddings")) {
+				return Promise.resolve(new Response(JSON.stringify({ data: [{ embedding: vec, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }), { status: 200 }));
 			}
 
 			if (urlStr.includes("/points/query")) {
@@ -202,8 +202,8 @@ describe("SemanticStore", () => {
 		globalThis.fetch = mock((url: string | Request) => {
 			const urlStr = typeof url === "string" ? url : url.url;
 
-			if (urlStr.includes("/api/embed")) {
-				return Promise.resolve(new Response(JSON.stringify({ embeddings: [vec] }), { status: 200 }));
+			if (urlStr.includes("/v1/embeddings")) {
+				return Promise.resolve(new Response(JSON.stringify({ data: [{ embedding: vec, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }), { status: 200 }));
 			}
 
 			if (urlStr.includes("/points/query")) {

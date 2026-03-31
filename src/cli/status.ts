@@ -7,7 +7,7 @@ type HealthResponse = {
 	agent: string;
 	role: { id: string; name: string };
 	channels: Record<string, boolean>;
-	memory: { qdrant: boolean; ollama: boolean };
+	memory: { qdrant: boolean; embeddings: boolean };
 	evolution: { generation: number };
 	onboarding?: string;
 	peers?: Record<string, { healthy: boolean; latencyMs: number; error?: string }>;
@@ -72,7 +72,7 @@ export async function runStatus(args: string[]): Promise<void> {
 
 	const channelStr = channelList.length > 0 ? channelList.join(", ") : "none";
 	const memoryStr =
-		data.memory.qdrant && data.memory.ollama ? "ok" : data.memory.qdrant || data.memory.ollama ? "degraded" : "offline";
+		data.memory.qdrant && data.memory.embeddings ? "ok" : data.memory.qdrant || data.memory.embeddings ? "degraded" : "offline";
 
 	console.log(
 		`${data.agent} | ${data.role.name} | v${data.version} | ` +

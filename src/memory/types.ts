@@ -101,6 +101,6 @@ export type QdrantSearchResult = {
 
 export type MemoryHealth = {
 	qdrant: boolean;
-	ollama: boolean;
+	embeddings: boolean;
 	configured: boolean;
 };

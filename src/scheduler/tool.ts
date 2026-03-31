@@ -56,7 +56,7 @@ to the current conversation.`,
 						if (!input.schedule) return err("schedule is required for create");
 						if (!input.task) return err("task is required for create");
 
-						const job = scheduler.createJob({
+						const job = await scheduler.createJob({
 							name: input.name,
 							description: input.description,
 							schedule: input.schedule,
@@ -76,7 +76,7 @@ to the current conversation.`,
 					}
 
 					case "list": {
-						const jobs = scheduler.listJobs();
+						const jobs = await scheduler.listJobs();
 						return ok({
 							count: jobs.length,
 							jobs: jobs.map((j) => ({
@@ -96,15 +96,15 @@ to the current conversation.`,
 					}
 
 					case "delete": {
-						const targetId = input.jobId ?? findJobIdByName(scheduler, input.name);
+						const targetId = input.jobId ?? await findJobIdByName(scheduler, input.name);
 						if (!targetId) return err("Provide jobId or name to delete");
 
-						const deleted = scheduler.deleteJob(targetId);
+						const deleted = await scheduler.deleteJob(targetId);
 						return ok({ deleted, id: targetId });
 					}
 
 					case "run": {
-						const targetId = input.jobId ?? findJobIdByName(scheduler, input.name);
+						const targetId = input.jobId ?? await findJobIdByName(scheduler, input.name);
 						if (!targetId) return err("Provide jobId or name to run");
 
 						const result = await scheduler.runJobNow(targetId);
@@ -127,9 +127,9 @@ to the current conversation.`,
 	});
 }
 
-function findJobIdByName(scheduler: Scheduler, name: string | undefined): string | undefined {
+async function findJobIdByName(scheduler: Scheduler, name: string | undefined): Promise<string | undefined> {
 	if (!name) return undefined;
-	const jobs = scheduler.listJobs();
+	const jobs = await scheduler.listJobs();
 	const lowerName = name.toLowerCase();
 	const match = jobs.find((j) => j.name.toLowerCase() === lowerName);
 	return match?.id;

@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 import type { SlackChannel } from "../channels/slack.ts";
 import type { RoleTemplate } from "../roles/types.ts";
 import { type OwnerProfile, type SlackProfileClient, hasPersonalizationData, profileOwner } from "./profiler.ts";
@@ -48,10 +48,10 @@ export async function startOnboarding(
 	target: OnboardingTarget,
 	phantomName: string,
 	role: RoleTemplate,
-	db: Database,
+	db: SupabaseClient,
 	slackClient?: SlackProfileClient,
 ): Promise<OwnerProfile | null> {
-	markOnboardingStarted(db);
+	await markOnboardingStarted(db);
 
 	// If we have a DM target and a slack client, profile the owner for personalization
 	let profile: OwnerProfile | null = null;

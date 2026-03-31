@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 
 export type OnboardingStatus = "pending" | "in_progress" | "complete";
 
@@ -8,24 +8,31 @@ export type OnboardingRecord = {
 	completed_at: string | null;
 };
 
-export function getOnboardingStatus(db: Database): OnboardingRecord {
-	const row = db
-		.query("SELECT status, started_at, completed_at FROM onboarding_state ORDER BY id DESC LIMIT 1")
-		.get() as OnboardingRecord | null;
+export async function getOnboardingStatus(db: SupabaseClient): Promise<OnboardingRecord> {
+	const { data } = await db
+		.from("onboarding_state")
+		.select("status, started_at, completed_at")
+		.order("id", { ascending: false })
+		.limit(1)
+		.maybeSingle();
 
-	return row ?? { status: "pending", started_at: null, completed_at: null };
+	return data ?? { status: "pending", started_at: null, completed_at: null };
 }
 
-export function markOnboardingStarted(db: Database): void {
-	const existing = getOnboardingStatus(db);
+export async function markOnboardingStarted(db: SupabaseClient): Promise<void> {
+	const existing = await getOnboardingStatus(db);
 	if (existing.status === "in_progress") return;
 
-	db.run("INSERT INTO onboarding_state (status, started_at) VALUES (?, datetime('now'))", ["in_progress"]);
+	await db.from("onboarding_state").insert({
+		status: "in_progress",
+		started_at: new Date().toISOString(),
+		completed_at: null,
+	});
 }
 
-export function markOnboardingComplete(db: Database): void {
-	db.run(
-		`UPDATE onboarding_state SET status = 'complete', completed_at = datetime('now')
-		 WHERE status = 'in_progress'`,
-	);
+export async function markOnboardingComplete(db: SupabaseClient): Promise<void> {
+	await db
+		.from("onboarding_state")
+		.update({ status: "complete", completed_at: new Date().toISOString() })
+		.eq("status", "in_progress");
 }

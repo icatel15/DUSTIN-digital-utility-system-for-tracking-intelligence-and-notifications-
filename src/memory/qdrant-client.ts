@@ -27,9 +27,11 @@ type QdrantScoredPoint = {
 
 export class QdrantClient {
 	private baseUrl: string;
+	private apiKey: string | undefined;
 
 	constructor(config: MemoryConfig) {
 		this.baseUrl = config.qdrant.url;
+		this.apiKey = config.qdrant.api_key;
 	}
 
 	async createCollection(name: string, schema: CollectionSchema): Promise<void> {
@@ -46,6 +48,7 @@ export class QdrantClient {
 	async collectionExists(name: string): Promise<boolean> {
 		try {
 			const response = await fetch(`${this.baseUrl}/collections/${name}`, {
+				headers: this.buildHeaders(),
 				signal: AbortSignal.timeout(5000),
 			});
 			return response.ok;
@@ -160,6 +163,7 @@ export class QdrantClient {
 	async isHealthy(): Promise<boolean> {
 		try {
 			const response = await fetch(`${this.baseUrl}/`, {
+				headers: this.buildHeaders(),
 				signal: AbortSignal.timeout(3000),
 			});
 			return response.ok;
@@ -254,6 +258,14 @@ export class QdrantClient {
 		}));
 	}
 
+	private buildHeaders(): Record<string, string> {
+		const headers: Record<string, string> = {};
+		if (this.apiKey) {
+			headers["api-key"] = this.apiKey;
+		}
+		return headers;
+	}
+
 	private async request(
 		method: string,
 		path: string,
@@ -261,7 +273,7 @@ export class QdrantClient {
 	): Promise<QdrantResponse & Record<string, unknown>> {
 		const response = await fetch(`${this.baseUrl}${path}`, {
 			method,
-			headers: { "Content-Type": "application/json" },
+			headers: { "Content-Type": "application/json", ...this.buildHeaders() },
 			body: body ? JSON.stringify(body) : undefined,
 			signal: AbortSignal.timeout(30000),
 		});

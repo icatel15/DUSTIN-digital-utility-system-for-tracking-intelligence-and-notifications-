@@ -7,9 +7,9 @@ import type { Episode } from "../types.ts";
 
 const TEST_CONFIG: MemoryConfig = {
 	qdrant: { url: "http://localhost:6333" },
-	ollama: { url: "http://localhost:11434", model: "nomic-embed-text" },
+	embeddings: { provider: "openai", api_key: "test-key", model: "text-embedding-3-small" },
 	collections: { episodes: "episodes", semantic_facts: "semantic_facts", procedures: "procedures" },
-	embedding: { dimensions: 768, batch_size: 32 },
+	embedding: { dimensions: 1536, batch_size: 32 },
 	context: { max_tokens: 50000, episode_limit: 10, fact_limit: 20, procedure_limit: 5 },
 };
 
@@ -38,8 +38,18 @@ function makeTestEpisode(overrides?: Partial<Episode>): Episode {
 	};
 }
 
-function make768dVector(): number[] {
-	return Array.from({ length: 768 }, (_, i) => Math.sin(i * 0.01));
+function makeVector(): number[] {
+	return Array.from({ length: 1536 }, (_, i) => Math.sin(i * 0.01));
+}
+
+function openaiEmbedResponse(...vecs: number[][]) {
+	return new Response(
+		JSON.stringify({
+			data: vecs.map((v, i) => ({ embedding: v, index: i })),
+			usage: { prompt_tokens: 5, total_tokens: 5 },
+		}),
+		{ status: 200, headers: { "Content-Type": "application/json" } },
+	);
 }
 
 describe("EpisodicStore", () => {
@@ -50,21 +60,16 @@ describe("EpisodicStore", () => {
 	});
 
 	test("store() embeds summary and detail, upserts to Qdrant", async () => {
-		const vec = make768dVector();
+		const vec = makeVector();
 		let upsertCalled = false;
 		let upsertBody: Record<string, unknown> | null = null;
 
 		globalThis.fetch = mock((url: string | Request, init?: RequestInit) => {
 			const urlStr = typeof url === "string" ? url : url.url;
 
-			// Ollama embed
-			if (urlStr.includes("/api/embed")) {
-				return Promise.resolve(
-					new Response(JSON.stringify({ embeddings: [vec, vec] }), {
-						status: 200,
-						headers: { "Content-Type": "application/json" },
-					}),
-				);
+			// OpenAI embed
+			if (urlStr.includes("/v1/embeddings")) {
+				return Promise.resolve(openaiEmbedResponse(vec, vec));
 			}
 
 			// Qdrant collection check
@@ -109,20 +114,15 @@ describe("EpisodicStore", () => {
 	});
 
 	test("recall() searches Qdrant and returns episodes", async () => {
-		const vec = make768dVector();
+		const vec = makeVector();
 		const now = Date.now();
 
 		globalThis.fetch = mock((url: string | Request, _init?: RequestInit) => {
 			const urlStr = typeof url === "string" ? url : url.url;
 
-			// Ollama embed (for query)
-			if (urlStr.includes("/api/embed")) {
-				return Promise.resolve(
-					new Response(JSON.stringify({ embeddings: [vec] }), {
-						status: 200,
-						headers: { "Content-Type": "application/json" },
-					}),
-				);
+			// OpenAI embed (for query)
+			if (urlStr.includes("/v1/embeddings")) {
+				return Promise.resolve(openaiEmbedResponse(vec));
 			}
 
 			// Qdrant query
@@ -176,14 +176,14 @@ describe("EpisodicStore", () => {
 	});
 
 	test("recall() applies recency-biased scoring by default", async () => {
-		const vec = make768dVector();
+		const vec = makeVector();
 		const now = Date.now();
 
 		globalThis.fetch = mock((url: string | Request) => {
 			const urlStr = typeof url === "string" ? url : url.url;
 
-			if (urlStr.includes("/api/embed")) {
-				return Promise.resolve(new Response(JSON.stringify({ embeddings: [vec] }), { status: 200 }));
+			if (urlStr.includes("/v1/embeddings")) {
+				return Promise.resolve(openaiEmbedResponse(vec));
 			}
 
 			if (urlStr.includes("/points/query")) {
@@ -236,14 +236,14 @@ describe("EpisodicStore", () => {
 	});
 
 	test("recall() metadata strategy favors reinforced memories", async () => {
-		const vec = make768dVector();
+		const vec = makeVector();
 		const now = Date.now();
 
 		globalThis.fetch = mock((url: string | Request) => {
 			const urlStr = typeof url === "string" ? url : url.url;
 
-			if (urlStr.includes("/api/embed")) {
-				return Promise.resolve(new Response(JSON.stringify({ embeddings: [vec] }), { status: 200 }));
+			if (urlStr.includes("/v1/embeddings")) {
+				return Promise.resolve(openaiEmbedResponse(vec));
 			}
 
 			if (urlStr.includes("/points/query")) {

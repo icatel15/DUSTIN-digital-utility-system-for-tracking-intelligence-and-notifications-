@@ -1,9 +1,8 @@
-import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { stringify } from "yaml";
-import { runMigrations } from "../../db/migrate.ts";
+import { createMockSupabase } from "../../db/test-helpers.ts";
 import { hashTokenSync } from "../config.ts";
 import { PhantomMcpServer } from "../server.ts";
 
@@ -109,12 +108,12 @@ async function callTool(
 }
 
 describe("SWE MCP Tools", () => {
-	let db: Database;
+	let db: ReturnType<typeof createMockSupabase>;
 	let mcpServer: PhantomMcpServer;
 	const adminToken = "swe-mcp-tools-test-token";
 	let tmpDir: string;
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		tmpDir = join(import.meta.dir, "tmp-swe-tools-test");
 		if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
 
@@ -124,10 +123,9 @@ describe("SWE MCP Tools", () => {
 		};
 		writeFileSync(join(tmpDir, "mcp.yaml"), stringify(mcpConfig));
 
-		db = new Database(":memory:");
-		runMigrations(db);
+		db = createMockSupabase();
 
-		mcpServer = new PhantomMcpServer(
+		mcpServer = await PhantomMcpServer.create(
 			{
 				config: {
 					name: "swe-test-phantom",
@@ -138,7 +136,7 @@ describe("SWE MCP Tools", () => {
 					max_budget_usd: 0,
 					timeout_minutes: 240,
 				},
-				db,
+				db: db as any,
 				startedAt: Date.now(),
 				runtime: createMockRuntime() as never,
 				memory: null,
@@ -151,7 +149,6 @@ describe("SWE MCP Tools", () => {
 
 	afterAll(async () => {
 		await mcpServer.close();
-		db.close();
 		if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true });
 	});
 

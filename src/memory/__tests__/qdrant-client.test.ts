@@ -4,9 +4,9 @@ import { QdrantClient } from "../qdrant-client.ts";
 
 const TEST_CONFIG: MemoryConfig = {
 	qdrant: { url: "http://localhost:6333" },
-	ollama: { url: "http://localhost:11434", model: "nomic-embed-text" },
+	embeddings: { provider: "openai", api_key: "test-key", model: "text-embedding-3-small" },
 	collections: { episodes: "episodes", semantic_facts: "semantic_facts", procedures: "procedures" },
-	embedding: { dimensions: 768, batch_size: 32 },
+	embedding: { dimensions: 1536, batch_size: 32 },
 	context: { max_tokens: 50000, episode_limit: 10, fact_limit: 20, procedure_limit: 5 },
 };
 

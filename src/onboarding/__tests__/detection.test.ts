@@ -1,8 +1,7 @@
-import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { runMigrations } from "../../db/migrate.ts";
+import { createMockSupabase } from "../../db/test-helpers.ts";
 import { isFirstRun, isOnboardingInProgress } from "../detection.ts";
 
 describe("isFirstRun", () => {
@@ -52,37 +51,37 @@ describe("isFirstRun", () => {
 });
 
 describe("isOnboardingInProgress", () => {
-	let db: Database;
+	let db: ReturnType<typeof createMockSupabase>;
 
 	beforeEach(() => {
-		db = new Database(":memory:");
-		db.run("PRAGMA journal_mode = WAL");
-		db.run("PRAGMA foreign_keys = ON");
-		runMigrations(db);
+		db = createMockSupabase();
 	});
 
-	afterEach(() => {
-		db.close();
+	test("returns false when no onboarding records exist", async () => {
+		expect(await isOnboardingInProgress(db as any)).toBe(false);
 	});
 
-	test("returns false when no onboarding records exist", () => {
-		expect(isOnboardingInProgress(db)).toBe(false);
+	test("returns true when status is in_progress", async () => {
+		await (db as any).from("onboarding_state").insert({
+			status: "in_progress",
+			started_at: new Date().toISOString(),
+		});
+		expect(await isOnboardingInProgress(db as any)).toBe(true);
 	});
 
-	test("returns true when status is in_progress", () => {
-		db.run("INSERT INTO onboarding_state (status, started_at) VALUES ('in_progress', datetime('now'))");
-		expect(isOnboardingInProgress(db)).toBe(true);
+	test("returns false when status is complete", async () => {
+		await (db as any).from("onboarding_state").insert({
+			status: "complete",
+			started_at: new Date().toISOString(),
+			completed_at: new Date().toISOString(),
+		});
+		expect(await isOnboardingInProgress(db as any)).toBe(false);
 	});
 
-	test("returns false when status is complete", () => {
-		db.run(
-			"INSERT INTO onboarding_state (status, started_at, completed_at) VALUES ('complete', datetime('now'), datetime('now'))",
-		);
-		expect(isOnboardingInProgress(db)).toBe(false);
-	});
-
-	test("returns false when status is pending", () => {
-		db.run("INSERT INTO onboarding_state (status) VALUES ('pending')");
-		expect(isOnboardingInProgress(db)).toBe(false);
+	test("returns false when status is pending", async () => {
+		await (db as any).from("onboarding_state").insert({
+			status: "pending",
+		});
+		expect(await isOnboardingInProgress(db as any)).toBe(false);
 	});
 });

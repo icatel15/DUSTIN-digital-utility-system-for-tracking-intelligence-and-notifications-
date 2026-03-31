@@ -32,7 +32,7 @@ function registerPhantomRegisterTool(server: McpServer, registry: DynamicToolReg
 		},
 		async (input): Promise<CallToolResult> => {
 			try {
-				const def = registry.register(input);
+				const def = await registry.register(input);
 				return {
 					content: [
 						{
@@ -78,7 +78,7 @@ function registerPhantomUnregisterTool(server: McpServer, registry: DynamicToolR
 				};
 			}
 
-			const removed = registry.unregister(name);
+			const removed = await registry.unregister(name);
 			return {
 				content: [
 					{

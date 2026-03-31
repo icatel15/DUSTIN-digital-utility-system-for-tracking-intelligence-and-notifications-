@@ -1,52 +1,25 @@
-import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
+import { createMockSupabase } from "../test-helpers.ts";
 import { runMigrations } from "../migrate.ts";
 
-function freshDb(): Database {
-	const db = new Database(":memory:");
-	db.run("PRAGMA journal_mode = WAL");
-	db.run("PRAGMA foreign_keys = ON");
-	return db;
-}
-
 describe("runMigrations", () => {
-	test("creates sessions, cost_events, onboarding_state, dynamic_tools, and scheduled_jobs tables", () => {
-		const db = freshDb();
-		runMigrations(db);
+	test("does not throw when given a valid Supabase client", async () => {
+		const db = createMockSupabase();
 
-		const tables = db
-			.query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-			.all()
-			.map((r) => (r as { name: string }).name);
+		// Pre-seed the sessions table so the connectivity check succeeds
+		await (db as any).from("sessions").insert({ id: 1 });
 
-		expect(tables).toContain("sessions");
-		expect(tables).toContain("cost_events");
-		expect(tables).toContain("onboarding_state");
-		expect(tables).toContain("dynamic_tools");
-		expect(tables).toContain("scheduled_jobs");
-		expect(tables).toContain("secrets");
-		expect(tables).toContain("secret_requests");
-		expect(tables).toContain("_migrations");
+		await expect(runMigrations(db as any)).resolves.toBeUndefined();
 	});
 
-	test("is idempotent - running twice does not fail", () => {
-		const db = freshDb();
-		runMigrations(db);
-		runMigrations(db);
+	test("is idempotent - running twice does not fail", async () => {
+		const db = createMockSupabase();
 
-		const migrationCount = db.query("SELECT COUNT(*) as count FROM _migrations").get() as { count: number };
-		expect(migrationCount.count).toBe(9);
-	});
+		// Pre-seed the sessions table so the connectivity check succeeds
+		await (db as any).from("sessions").insert({ id: 1 });
 
-	test("tracks applied migration indices", () => {
-		const db = freshDb();
-		runMigrations(db);
-
-		const indices = db
-			.query("SELECT index_num FROM _migrations ORDER BY index_num")
-			.all()
-			.map((r) => (r as { index_num: number }).index_num);
-
-		expect(indices).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+		await runMigrations(db as any);
+		await runMigrations(db as any);
+		// No error means success
 	});
 });

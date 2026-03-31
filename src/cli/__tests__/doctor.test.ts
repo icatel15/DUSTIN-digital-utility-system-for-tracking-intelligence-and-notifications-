@@ -31,7 +31,7 @@ describe("phantom doctor", () => {
 		expect(logs.some((l) => l.includes("Bun"))).toBe(true);
 		expect(logs.some((l) => l.includes("Docker"))).toBe(true);
 		expect(logs.some((l) => l.includes("Config"))).toBe(true);
-		expect(logs.some((l) => l.includes("SQLite"))).toBe(true);
+		expect(logs.some((l) => l.includes("Supabase"))).toBe(true);
 	});
 
 	test("outputs JSON with --json flag", async () => {

@@ -1,6 +1,5 @@
-import { Database } from "bun:sqlite";
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import { runMigrations } from "../../db/migrate.ts";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { createMockSupabase } from "../../db/test-helpers.ts";
 import { Scheduler } from "../service.ts";
 import { createSchedulerToolServer } from "../tool.ts";
 
@@ -23,25 +22,14 @@ function createMockRuntime() {
 }
 
 describe("createSchedulerToolServer", () => {
-	let db: Database;
+	let db: ReturnType<typeof createMockSupabase>;
 	let mockRuntime: ReturnType<typeof createMockRuntime>;
 	let scheduler: Scheduler;
 
-	beforeAll(() => {
-		db = new Database(":memory:");
-		db.run("PRAGMA journal_mode = WAL");
-		db.run("PRAGMA foreign_keys = ON");
-		runMigrations(db);
-	});
-
 	beforeEach(() => {
-		db.run("DELETE FROM scheduled_jobs");
+		db = createMockSupabase();
 		mockRuntime = createMockRuntime();
-		scheduler = new Scheduler({ db, runtime: mockRuntime as never });
-	});
-
-	afterAll(() => {
-		db.close();
+		scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
 	});
 
 	test("returns a valid SDK MCP server config", () => {
@@ -57,8 +45,8 @@ describe("createSchedulerToolServer", () => {
 		expect(server.name).toBe("phantom-scheduler");
 	});
 
-	test("create action via scheduler creates a job", () => {
-		const job = scheduler.createJob({
+	test("create action via scheduler creates a job", async () => {
+		const job = await scheduler.createJob({
 			name: "Tool Test",
 			schedule: { kind: "every", intervalMs: 120_000 },
 			task: "Tool test task",
@@ -67,28 +55,28 @@ describe("createSchedulerToolServer", () => {
 		expect(job.id).toBeTruthy();
 		expect(job.name).toBe("Tool Test");
 
-		const listed = scheduler.listJobs();
+		const listed = await scheduler.listJobs();
 		expect(listed.length).toBe(1);
 	});
 
-	test("list action via scheduler returns jobs", () => {
-		scheduler.createJob({ name: "J1", schedule: { kind: "every", intervalMs: 60_000 }, task: "T1" });
-		scheduler.createJob({ name: "J2", schedule: { kind: "every", intervalMs: 60_000 }, task: "T2" });
+	test("list action via scheduler returns jobs", async () => {
+		await scheduler.createJob({ name: "J1", schedule: { kind: "every", intervalMs: 60_000 }, task: "T1" });
+		await scheduler.createJob({ name: "J2", schedule: { kind: "every", intervalMs: 60_000 }, task: "T2" });
 
-		const jobs = scheduler.listJobs();
+		const jobs = await scheduler.listJobs();
 		expect(jobs.length).toBe(2);
 	});
 
-	test("delete action via scheduler removes a job", () => {
-		const job = scheduler.createJob({ name: "Deletable", schedule: { kind: "every", intervalMs: 60_000 }, task: "D" });
+	test("delete action via scheduler removes a job", async () => {
+		const job = await scheduler.createJob({ name: "Deletable", schedule: { kind: "every", intervalMs: 60_000 }, task: "D" });
 
-		const deleted = scheduler.deleteJob(job.id);
+		const deleted = await scheduler.deleteJob(job.id);
 		expect(deleted).toBe(true);
-		expect(scheduler.listJobs().length).toBe(0);
+		expect((await scheduler.listJobs()).length).toBe(0);
 	});
 
 	test("run action via scheduler triggers the job", async () => {
-		const job = scheduler.createJob({
+		const job = await scheduler.createJob({
 			name: "Runnable",
 			schedule: { kind: "every", intervalMs: 60_000 },
 			task: "Run me",

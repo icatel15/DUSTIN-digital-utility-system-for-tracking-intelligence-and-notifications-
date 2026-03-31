@@ -1,9 +1,8 @@
-import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { stringify } from "yaml";
-import { runMigrations } from "../../db/migrate.ts";
+import { createMockSupabase } from "../../db/test-helpers.ts";
 import { hashTokenSync } from "../config.ts";
 import { DynamicToolRegistry } from "../dynamic-tools.ts";
 import { PhantomMcpServer } from "../server.ts";
@@ -77,25 +76,22 @@ async function callTool(
 }
 
 describe("DynamicToolRegistry", () => {
-	let db: Database;
+	let db: ReturnType<typeof createMockSupabase>;
 
 	beforeAll(() => {
-		db = new Database(":memory:");
-		runMigrations(db);
+		db = createMockSupabase();
 	});
 
-	afterAll(() => {
-		db.close();
-	});
-
-	test("starts with zero tools", () => {
-		const registry = new DynamicToolRegistry(db);
+	test("starts with zero tools", async () => {
+		const registry = new DynamicToolRegistry(db as any);
+		await registry.loadFromDatabase();
 		expect(registry.count()).toBe(0);
 	});
 
-	test("registers a shell tool", () => {
-		const registry = new DynamicToolRegistry(db);
-		const def = registry.register({
+	test("registers a shell tool", async () => {
+		const registry = new DynamicToolRegistry(db as any);
+		await registry.loadFromDatabase();
+		const def = await registry.register({
 			name: "test_hello",
 			description: "Says hello",
 			input_schema: { name: "string" },
@@ -109,15 +105,17 @@ describe("DynamicToolRegistry", () => {
 		expect(registry.has("test_hello")).toBe(true);
 	});
 
-	test("persists tools to SQLite", () => {
-		const registry2 = new DynamicToolRegistry(db);
+	test("persists tools to database", async () => {
+		const registry2 = new DynamicToolRegistry(db as any);
+		await registry2.loadFromDatabase();
 		expect(registry2.has("test_hello")).toBe(true);
 		expect(registry2.count()).toBeGreaterThanOrEqual(1);
 	});
 
-	test("unregisters a tool", () => {
-		const registry = new DynamicToolRegistry(db);
-		registry.register({
+	test("unregisters a tool", async () => {
+		const registry = new DynamicToolRegistry(db as any);
+		await registry.loadFromDatabase();
+		await registry.register({
 			name: "to_remove",
 			description: "Will be removed",
 			input_schema: {},
@@ -126,22 +124,25 @@ describe("DynamicToolRegistry", () => {
 		});
 		expect(registry.has("to_remove")).toBe(true);
 
-		const removed = registry.unregister("to_remove");
+		const removed = await registry.unregister("to_remove");
 		expect(removed).toBe(true);
 		expect(registry.has("to_remove")).toBe(false);
 
-		const registry3 = new DynamicToolRegistry(db);
+		const registry3 = new DynamicToolRegistry(db as any);
+		await registry3.loadFromDatabase();
 		expect(registry3.has("to_remove")).toBe(false);
 	});
 
-	test("unregister returns false for unknown tools", () => {
-		const registry = new DynamicToolRegistry(db);
-		expect(registry.unregister("nonexistent")).toBe(false);
+	test("unregister returns false for unknown tools", async () => {
+		const registry = new DynamicToolRegistry(db as any);
+		await registry.loadFromDatabase();
+		expect(await registry.unregister("nonexistent")).toBe(false);
 	});
 
-	test("rejects invalid tool names", () => {
-		const registry = new DynamicToolRegistry(db);
-		expect(() =>
+	test("rejects invalid tool names", async () => {
+		const registry = new DynamicToolRegistry(db as any);
+		await registry.loadFromDatabase();
+		expect(
 			registry.register({
 				name: "Invalid Name",
 				description: "Bad name",
@@ -149,58 +150,61 @@ describe("DynamicToolRegistry", () => {
 				handler_type: "shell",
 				handler_code: "echo x",
 			}),
-		).toThrow();
+		).rejects.toThrow();
 	});
 
-	test("rejects inline handler type", () => {
-		const registry = new DynamicToolRegistry(db);
-		expect(() =>
+	test("rejects inline handler type", async () => {
+		const registry = new DynamicToolRegistry(db as any);
+		await registry.loadFromDatabase();
+		expect(
 			registry.register({
 				name: "no_inline",
 				description: "Inline is removed",
 				input_schema: {},
 				handler_type: "inline" as "shell",
 			}),
-		).toThrow();
+		).rejects.toThrow();
 	});
 
-	test("requires handler_path for script type", () => {
-		const registry = new DynamicToolRegistry(db);
-		expect(() =>
+	test("requires handler_path for script type", async () => {
+		const registry = new DynamicToolRegistry(db as any);
+		await registry.loadFromDatabase();
+		expect(
 			registry.register({
 				name: "no_path",
 				description: "Missing path",
 				input_schema: {},
 				handler_type: "script",
 			}),
-		).toThrow("handler_path is required");
+		).rejects.toThrow("handler_path is required");
 	});
 
-	test("requires handler_code for shell type", () => {
-		const registry = new DynamicToolRegistry(db);
-		expect(() =>
+	test("requires handler_code for shell type", async () => {
+		const registry = new DynamicToolRegistry(db as any);
+		await registry.loadFromDatabase();
+		expect(
 			registry.register({
 				name: "no_shell_code",
 				description: "Missing code",
 				input_schema: {},
 				handler_type: "shell",
 			}),
-		).toThrow("handler_code is required");
+		).rejects.toThrow("handler_code is required");
 	});
 
-	test("getAll returns all registered tools", () => {
-		const freshDb = new Database(":memory:");
-		runMigrations(freshDb);
+	test("getAll returns all registered tools", async () => {
+		const freshDb = createMockSupabase();
 
-		const registry = new DynamicToolRegistry(freshDb);
-		registry.register({
+		const registry = new DynamicToolRegistry(freshDb as any);
+		await registry.loadFromDatabase();
+		await registry.register({
 			name: "tool_a",
 			description: "Tool A",
 			input_schema: {},
 			handler_type: "shell",
 			handler_code: "echo a",
 		});
-		registry.register({
+		await registry.register({
 			name: "tool_b",
 			description: "Tool B",
 			input_schema: {},
@@ -211,16 +215,14 @@ describe("DynamicToolRegistry", () => {
 		const all = registry.getAll();
 		expect(all).toHaveLength(2);
 		expect(all.map((t) => t.name)).toEqual(["tool_a", "tool_b"]);
-
-		freshDb.close();
 	});
 
-	test("upserts on duplicate name", () => {
-		const freshDb = new Database(":memory:");
-		runMigrations(freshDb);
+	test("upserts on duplicate name", async () => {
+		const freshDb = createMockSupabase();
 
-		const registry = new DynamicToolRegistry(freshDb);
-		registry.register({
+		const registry = new DynamicToolRegistry(freshDb as any);
+		await registry.loadFromDatabase();
+		await registry.register({
 			name: "update_me",
 			description: "Version 1",
 			input_schema: {},
@@ -228,7 +230,7 @@ describe("DynamicToolRegistry", () => {
 			handler_code: "echo v1",
 		});
 
-		registry.register({
+		await registry.register({
 			name: "update_me",
 			description: "Version 2",
 			input_schema: {},
@@ -238,18 +240,16 @@ describe("DynamicToolRegistry", () => {
 
 		expect(registry.count()).toBe(1);
 		expect(registry.get("update_me")?.description).toBe("Version 2");
-
-		freshDb.close();
 	});
 });
 
 describe("Dynamic Tools via MCP Protocol", () => {
-	let db: Database;
+	let db: ReturnType<typeof createMockSupabase>;
 	let mcpServer: PhantomMcpServer;
 	const adminToken = "dynamic-tools-test-token";
 	let tmpDir: string;
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		tmpDir = join(import.meta.dir, "tmp-dynamic-tools-test");
 		if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
 
@@ -259,10 +259,9 @@ describe("Dynamic Tools via MCP Protocol", () => {
 		};
 		writeFileSync(join(tmpDir, "mcp.yaml"), stringify(mcpConfig));
 
-		db = new Database(":memory:");
-		runMigrations(db);
+		db = createMockSupabase();
 
-		mcpServer = new PhantomMcpServer(
+		mcpServer = await PhantomMcpServer.create(
 			{
 				config: {
 					name: "dynamic-test-phantom",
@@ -273,7 +272,7 @@ describe("Dynamic Tools via MCP Protocol", () => {
 					max_budget_usd: 0,
 					timeout_minutes: 240,
 				},
-				db,
+				db: db as any,
 				startedAt: Date.now(),
 				runtime: createMockRuntime() as never,
 				memory: null,
@@ -285,7 +284,6 @@ describe("Dynamic Tools via MCP Protocol", () => {
 
 	afterAll(async () => {
 		await mcpServer.close();
-		db.close();
 		if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true });
 	});
 

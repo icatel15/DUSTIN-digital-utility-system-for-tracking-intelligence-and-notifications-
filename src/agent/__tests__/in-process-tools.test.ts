@@ -1,31 +1,16 @@
-import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { createMockSupabase } from "../../db/test-helpers.ts";
 import { DynamicToolRegistry } from "../../mcp/dynamic-tools.ts";
 import { createInProcessToolServer } from "../in-process-tools.ts";
 
 describe("createInProcessToolServer", () => {
-	let db: Database;
+	let db: ReturnType<typeof createMockSupabase>;
 	let registry: DynamicToolRegistry;
 
-	beforeAll(() => {
-		db = new Database(":memory:");
-		db.run(
-			`CREATE TABLE IF NOT EXISTS dynamic_tools (
-				name TEXT PRIMARY KEY,
-				description TEXT NOT NULL,
-				input_schema TEXT NOT NULL,
-				handler_type TEXT NOT NULL DEFAULT 'inline',
-				handler_code TEXT,
-				handler_path TEXT,
-				registered_at TEXT NOT NULL DEFAULT (datetime('now')),
-				registered_by TEXT
-			)`,
-		);
-		registry = new DynamicToolRegistry(db);
-	});
-
-	afterAll(() => {
-		db.close();
+	beforeAll(async () => {
+		db = createMockSupabase();
+		registry = new DynamicToolRegistry(db as any);
+		await registry.loadFromDatabase();
 	});
 
 	test("returns a valid SDK MCP server config", () => {
@@ -36,8 +21,8 @@ describe("createInProcessToolServer", () => {
 		expect(server.instance).toBeDefined();
 	});
 
-	test("shares the same registry instance", () => {
-		registry.register({
+	test("shares the same registry instance", async () => {
+		await registry.register({
 			name: "shared_test",
 			description: "Test shared registry",
 			input_schema: {},
@@ -48,7 +33,7 @@ describe("createInProcessToolServer", () => {
 		expect(registry.has("shared_test")).toBe(true);
 
 		// Clean up
-		registry.unregister("shared_test");
+		await registry.unregister("shared_test");
 	});
 
 	test("server has correct type for SDK mcpServers config", () => {

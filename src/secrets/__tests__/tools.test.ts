@@ -1,17 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { randomBytes } from "node:crypto";
-import { createTestDatabase } from "../../db/connection.ts";
-import { MIGRATIONS } from "../../db/schema.ts";
+import { createMockSupabase } from "../../db/test-helpers.ts";
 import { resetKeyCache } from "../crypto.ts";
 import { createSecretToolServer } from "../tools.ts";
 
 function setup() {
 	resetKeyCache();
 	process.env.SECRET_ENCRYPTION_KEY = randomBytes(32).toString("hex");
-	const db = createTestDatabase();
-	for (const migration of MIGRATIONS) {
-		db.run(migration);
-	}
+	const db = createMockSupabase() as any;
 	return { db };
 }
 

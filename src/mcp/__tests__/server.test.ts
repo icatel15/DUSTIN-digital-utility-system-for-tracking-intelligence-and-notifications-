@@ -1,6 +1,5 @@
-import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { runMigrations } from "../../db/migrate.ts";
+import { createMockSupabase } from "../../db/test-helpers.ts";
 import { hashTokenSync } from "../config.ts";
 import { PhantomMcpServer } from "../server.ts";
 
@@ -87,7 +86,7 @@ async function initSession(server: PhantomMcpServer, token: string, name = "test
 }
 
 describe("PhantomMcpServer", () => {
-	let db: Database;
+	let db: ReturnType<typeof createMockSupabase>;
 	let mcpServer: PhantomMcpServer;
 	const adminToken = "test-admin-for-mcp-server";
 	const readToken = "test-read-for-mcp-server";
@@ -98,8 +97,7 @@ describe("PhantomMcpServer", () => {
 		const { join } = await import("node:path");
 		const YAML = (await import("yaml")).default;
 
-		db = new Database(":memory:");
-		runMigrations(db);
+		db = createMockSupabase();
 
 		tmpDir = join(import.meta.dir, "tmp-mcp-server-test");
 		if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
@@ -124,10 +122,10 @@ describe("PhantomMcpServer", () => {
 			timeout_minutes: 240,
 		};
 
-		mcpServer = new PhantomMcpServer(
+		mcpServer = await PhantomMcpServer.create(
 			{
 				config: phantomConfig,
-				db,
+				db: db as any,
 				startedAt: Date.now(),
 				runtime: createMockRuntime() as never,
 				memory: null,
@@ -139,7 +137,6 @@ describe("PhantomMcpServer", () => {
 
 	afterAll(async () => {
 		await mcpServer.close();
-		db.close();
 		const { rmSync, existsSync } = await import("node:fs");
 		if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true });
 	});
@@ -324,10 +321,9 @@ describe("PhantomMcpServer", () => {
 			}),
 		);
 
-		const rlDb = new Database(":memory:");
-		runMigrations(rlDb);
+		const rlDb = createMockSupabase();
 
-		const rlServer = new PhantomMcpServer(
+		const rlServer = await PhantomMcpServer.create(
 			{
 				config: {
 					name: "limited",
@@ -338,7 +334,7 @@ describe("PhantomMcpServer", () => {
 					max_budget_usd: 0,
 					timeout_minutes: 240,
 				},
-				db: rlDb,
+				db: rlDb as any,
 				startedAt: Date.now(),
 				runtime: createMockRuntime() as never,
 				memory: null,
@@ -357,14 +353,13 @@ describe("PhantomMcpServer", () => {
 		expect(blocked.headers.get("Retry-After")).toBeTruthy();
 
 		await rlServer.close();
-		rlDb.close();
 
 		const { rmSync } = await import("node:fs");
 		if (existsSync(rlDir)) rmSync(rlDir, { recursive: true });
 	});
 
 	test("audit log records interactions", async () => {
-		const auditLog = mcpServer.getAuditLog(50);
+		const auditLog = await mcpServer.getAuditLog(50);
 		expect(auditLog.length).toBeGreaterThan(0);
 	});
 

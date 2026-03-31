@@ -4,10 +4,16 @@ description: Current implementation phase and key decisions for the DUSTIN AI as
 type: project
 ---
 
-DUSTIN is forked from ghostwright/phantom v0.18.1 (789 tests passing). Phase 0 (setup & docs) is complete as of 2026-03-31. Phase 1 (data layer swap) is next.
+DUSTIN is forked from ghostwright/phantom v0.18.1 (789 tests passing). Phase 0 and Phase 1 complete as of 2026-03-31. Phase 2 (Telegram + two-user support) is next.
 
-**Key recon finding**: Qdrant and Ollama are cleanly abstracted behind single classes in `src/memory/`. SQLite is more spread out but uses dependency injection. Migration risk is LOW for memory services, MODERATE for SQLite→Supabase.
+**Phase 1 key changes:**
+- Qdrant Cloud: API key auth added to QdrantClient, removed local Docker container
+- OpenAI embeddings: Replaced Ollama with text-embedding-3-small (768d→1536d), dimensions now config-driven
+- Supabase: Replaced all bun:sqlite with @supabase/supabase-js, 15+ production files converted sync→async
+- PhantomMcpServer uses factory pattern (`create()`) due to async initialization
+- Test mock: `src/db/test-helpers.ts` provides MockSupabaseClient for all tests
+- Migrations: SQL files in `supabase/migrations/`, applied via CLI, not app code
 
-**Why:** The base file's "critical risk" about scattered Qdrant calls does not apply — the codebase is well-structured.
+**Why:** VPS becomes purely compute — no critical data on the VM.
 
-**How to apply:** Phase 1 implementation can proceed confidently with WS-1+WS-2 (memory) in parallel with WS-3 (database). No abstraction layer needs to be built first.
+**How to apply:** Phase 2 can proceed independently. User needs to set up Qdrant Cloud, Supabase, and OpenAI accounts before deploying.

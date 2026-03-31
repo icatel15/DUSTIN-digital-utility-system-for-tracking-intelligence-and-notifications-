@@ -1,69 +1,77 @@
 import type { MemoryConfig } from "../config/types.ts";
 import type { SparseVector } from "./types.ts";
 
+const OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings";
+
+type OpenAIEmbeddingResponse = {
+	data: { embedding: number[]; index: number }[];
+	usage: { prompt_tokens: number; total_tokens: number };
+};
+
 export class EmbeddingClient {
-	private baseUrl: string;
+	private apiKey: string;
 	private model: string;
 
 	constructor(config: MemoryConfig) {
-		this.baseUrl = config.ollama.url;
-		this.model = config.ollama.model;
+		const key = config.embeddings.api_key;
+		if (!key) {
+			throw new Error("Embedding API key is required. Set OPENAI_API_KEY environment variable.");
+		}
+		this.apiKey = key;
+		this.model = config.embeddings.model;
 	}
 
 	async embed(text: string): Promise<number[]> {
-		const response = await fetch(`${this.baseUrl}/api/embed`, {
+		const response = await fetch(OPENAI_EMBEDDINGS_URL, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${this.apiKey}`,
+			},
 			body: JSON.stringify({ model: this.model, input: text }),
 		});
 
 		if (!response.ok) {
 			const body = await response.text().catch(() => "");
-			throw new Error(
-				`Ollama embedding failed (${response.status}): ${body || response.statusText}. ` +
-					`Is Ollama running at ${this.baseUrl} with model "${this.model}" pulled?`,
-			);
+			throw new Error(`OpenAI embedding failed (${response.status}): ${body || response.statusText}`);
 		}
 
-		const data = (await response.json()) as { embeddings: number[][] };
+		const data = (await response.json()) as OpenAIEmbeddingResponse;
 
-		if (!data.embeddings?.[0]) {
-			throw new Error("Ollama returned empty embeddings. Check that the model is loaded.");
+		if (!data.data?.[0]?.embedding) {
+			throw new Error("OpenAI returned empty embeddings.");
 		}
 
-		return data.embeddings[0];
+		return data.data[0].embedding;
 	}
 
 	async embedBatch(texts: string[]): Promise<number[][]> {
-		const response = await fetch(`${this.baseUrl}/api/embed`, {
+		const response = await fetch(OPENAI_EMBEDDINGS_URL, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${this.apiKey}`,
+			},
 			body: JSON.stringify({ model: this.model, input: texts }),
 		});
 
 		if (!response.ok) {
 			const body = await response.text().catch(() => "");
-			throw new Error(`Ollama batch embedding failed (${response.status}): ${body || response.statusText}`);
+			throw new Error(`OpenAI batch embedding failed (${response.status}): ${body || response.statusText}`);
 		}
 
-		const data = (await response.json()) as { embeddings: number[][] };
+		const data = (await response.json()) as OpenAIEmbeddingResponse;
 
-		if (!data.embeddings || data.embeddings.length !== texts.length) {
-			throw new Error(`Ollama returned ${data.embeddings?.length ?? 0} embeddings for ${texts.length} inputs`);
+		if (!data.data || data.data.length !== texts.length) {
+			throw new Error(`OpenAI returned ${data.data?.length ?? 0} embeddings for ${texts.length} inputs`);
 		}
 
-		return data.embeddings;
+		// OpenAI returns results sorted by index
+		return data.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
 	}
 
 	async isHealthy(): Promise<boolean> {
-		try {
-			const response = await fetch(`${this.baseUrl}/api/tags`, {
-				signal: AbortSignal.timeout(3000),
-			});
-			return response.ok;
-		} catch {
-			return false;
-		}
+		return !!this.apiKey;
 	}
 }
 

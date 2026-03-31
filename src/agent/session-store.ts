@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 
 export type Session = {
 	id: number;
@@ -18,71 +18,81 @@ export type Session = {
 const STALE_HOURS = 24;
 
 export class SessionStore {
-	private db: Database;
+	private db: SupabaseClient;
 
-	constructor(db: Database) {
+	constructor(db: SupabaseClient) {
 		this.db = db;
 	}
 
-	create(channelId: string, conversationId: string): Session {
+	async create(channelId: string, conversationId: string): Promise<Session> {
 		const sessionKey = `${channelId}:${conversationId}`;
+		const now = new Date().toISOString();
 
 		// Upsert: if an expired row with this key exists, reactivate it
 		// instead of failing on the UNIQUE constraint.
-		this.db.run(
-			`INSERT INTO sessions (session_key, channel_id, conversation_id)
-			 VALUES (?, ?, ?)
-			 ON CONFLICT(session_key) DO UPDATE SET
-			   status = 'active',
-			   sdk_session_id = NULL,
-			   last_active_at = datetime('now')`,
-			[sessionKey, channelId, conversationId],
+		await this.db.from("sessions").upsert(
+			{
+				session_key: sessionKey,
+				channel_id: channelId,
+				conversation_id: conversationId,
+				status: "active",
+				sdk_session_id: null,
+				total_cost_usd: 0,
+				input_tokens: 0,
+				output_tokens: 0,
+				turn_count: 0,
+				last_active_at: now,
+				created_at: now,
+			},
+			{ onConflict: "session_key" },
 		);
 
-		return this.getByKey(sessionKey) as Session;
+		return (await this.getByKey(sessionKey)) as Session;
 	}
 
-	getByKey(sessionKey: string): Session | null {
-		return this.db.query("SELECT * FROM sessions WHERE session_key = ?").get(sessionKey) as Session | null;
+	async getByKey(sessionKey: string): Promise<Session | null> {
+		const { data } = await this.db.from("sessions").select("*").eq("session_key", sessionKey).maybeSingle();
+		return data as Session | null;
 	}
 
-	findActive(channelId: string, conversationId: string): Session | null {
+	async findActive(channelId: string, conversationId: string): Promise<Session | null> {
 		const sessionKey = `${channelId}:${conversationId}`;
-		const session = this.getByKey(sessionKey);
+		const session = await this.getByKey(sessionKey);
 
 		if (!session) return null;
 		if (session.status !== "active") return null;
 
 		if (this.isStale(session)) {
-			this.expire(sessionKey);
+			await this.expire(sessionKey);
 			return null;
 		}
 
 		return session;
 	}
 
-	updateSdkSessionId(sessionKey: string, sdkSessionId: string): void {
-		this.db.run(
-			`UPDATE sessions SET sdk_session_id = ?, last_active_at = datetime('now')
-			 WHERE session_key = ?`,
-			[sdkSessionId, sessionKey],
-		);
+	async updateSdkSessionId(sessionKey: string, sdkSessionId: string): Promise<void> {
+		const now = new Date().toISOString();
+		await this.db
+			.from("sessions")
+			.update({ sdk_session_id: sdkSessionId, last_active_at: now })
+			.eq("session_key", sessionKey);
 	}
 
-	clearSdkSessionId(sessionKey: string): void {
-		this.db.run(
-			`UPDATE sessions SET sdk_session_id = NULL, last_active_at = datetime('now')
-			 WHERE session_key = ?`,
-			[sessionKey],
-		);
+	async clearSdkSessionId(sessionKey: string): Promise<void> {
+		const now = new Date().toISOString();
+		await this.db
+			.from("sessions")
+			.update({ sdk_session_id: null, last_active_at: now })
+			.eq("session_key", sessionKey);
 	}
 
-	touch(sessionKey: string): void {
-		this.db.run("UPDATE sessions SET last_active_at = datetime('now') WHERE session_key = ?", [sessionKey]);
+	async touch(sessionKey: string): Promise<void> {
+		const now = new Date().toISOString();
+		await this.db.from("sessions").update({ last_active_at: now }).eq("session_key", sessionKey);
 	}
 
-	expire(sessionKey: string): void {
-		this.db.run("UPDATE sessions SET status = 'expired' WHERE session_key = ?", [sessionKey]);
+	async expire(sessionKey: string): Promise<void> {
+		await this.db.from("sessions").update({ status: "expired" }).eq("session_key", sessionKey);
 	}
 
 	private isStale(session: Session): boolean {

@@ -1,83 +1,57 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "[phantom] Starting bootstrap..."
+echo "[dustin] Starting bootstrap..."
 
 # Restore default phantom-config if volume is empty (first run)
 if [ ! -f /app/phantom-config/constitution.md ]; then
-  echo "[phantom] First run - copying default phantom-config..."
+  echo "[dustin] First run - copying default phantom-config..."
   cp -r /app/phantom-config-defaults/* /app/phantom-config/ 2>/dev/null || true
 fi
 
-# Determine service URLs from environment (with Docker Compose defaults)
-QDRANT_URL="${QDRANT_URL:-http://qdrant:6333}"
-OLLAMA_URL="${OLLAMA_URL:-http://ollama:11434}"
-EMBEDDING_MODEL="${EMBEDDING_MODEL:-nomic-embed-text}"
-
-# 1. Wait for Qdrant to be healthy (up to 60 seconds)
-echo "[phantom] Waiting for Qdrant at ${QDRANT_URL}..."
-QDRANT_READY=false
-for i in $(seq 1 60); do
-  if curl -sf "${QDRANT_URL}/healthz" > /dev/null 2>&1; then
-    QDRANT_READY=true
-    echo "[phantom] Qdrant is ready"
-    break
+# 1. Check Qdrant Cloud connectivity (up to 30 seconds)
+QDRANT_URL="${QDRANT_URL:-}"
+if [ -n "$QDRANT_URL" ]; then
+  echo "[dustin] Checking Qdrant Cloud at ${QDRANT_URL}..."
+  QDRANT_READY=false
+  QDRANT_HEADERS=""
+  if [ -n "${QDRANT_API_KEY:-}" ]; then
+    QDRANT_HEADERS="-H api-key:${QDRANT_API_KEY}"
   fi
-  sleep 1
-done
-if [ "$QDRANT_READY" = false ]; then
-  echo "[phantom] WARNING: Qdrant not available after 60s. Starting in degraded mode."
-fi
-
-# 2. Wait for Ollama to be ready (up to 60 seconds)
-echo "[phantom] Waiting for Ollama at ${OLLAMA_URL}..."
-OLLAMA_READY=false
-for i in $(seq 1 60); do
-  if curl -sf "${OLLAMA_URL}/api/tags" > /dev/null 2>&1; then
-    OLLAMA_READY=true
-    echo "[phantom] Ollama is ready"
-    break
+  for i in $(seq 1 30); do
+    if curl -sf ${QDRANT_HEADERS} "${QDRANT_URL}/" > /dev/null 2>&1; then
+      QDRANT_READY=true
+      echo "[dustin] Qdrant Cloud is reachable"
+      break
+    fi
+    sleep 1
+  done
+  if [ "$QDRANT_READY" = false ]; then
+    echo "[dustin] WARNING: Qdrant Cloud not reachable after 30s. Starting in degraded mode."
   fi
-  sleep 1
-done
-if [ "$OLLAMA_READY" = false ]; then
-  echo "[phantom] WARNING: Ollama not available after 60s. Starting without embeddings."
-fi
-
-# 3. Pull embedding model if Ollama is ready and model is missing
-if [ "$OLLAMA_READY" = true ]; then
-  MODEL_EXISTS=$(curl -sf "${OLLAMA_URL}/api/tags" | jq -r ".models[]?.name // empty" | grep -c "^${EMBEDDING_MODEL}" || true)
-  if [ "$MODEL_EXISTS" = "0" ]; then
-    echo "[phantom] Pulling ${EMBEDDING_MODEL} model (first run, ~270MB)..."
-    curl -sf "${OLLAMA_URL}/api/pull" -d "{\"name\":\"${EMBEDDING_MODEL}\"}" | while IFS= read -r line; do
-      status=$(echo "$line" | jq -r '.status // empty' 2>/dev/null)
-      if [ -n "$status" ] && [ "$status" != "null" ]; then
-        echo "[phantom] Model pull: $status"
-      fi
-    done
-    echo "[phantom] Model pull complete"
-  else
-    echo "[phantom] Embedding model ${EMBEDDING_MODEL} already available"
-  fi
-fi
-
-# 4. Run phantom init if config does not exist (first run)
-if [ ! -f /app/config/phantom.yaml ]; then
-  echo "[phantom] First run detected. Initializing configuration..."
-
-  # Export memory URLs for the init command
-  export QDRANT_URL
-  export OLLAMA_URL
-
-  bun run src/cli/main.ts init --yes
-  echo "[phantom] Configuration initialized"
 else
-  echo "[phantom] Configuration exists, skipping init"
+  echo "[dustin] WARNING: QDRANT_URL not set. Memory system will be unavailable."
 fi
 
-# 5. Set Docker awareness flag
+# 2. Check OpenAI API key
+if [ -n "${OPENAI_API_KEY:-}" ]; then
+  echo "[dustin] OpenAI API key configured"
+else
+  echo "[dustin] WARNING: OPENAI_API_KEY not set. Embeddings will be unavailable."
+fi
+
+# 3. Run phantom init if config does not exist (first run)
+if [ ! -f /app/config/phantom.yaml ]; then
+  echo "[dustin] First run detected. Initializing configuration..."
+  bun run src/cli/main.ts init --yes
+  echo "[dustin] Configuration initialized"
+else
+  echo "[dustin] Configuration exists, skipping init"
+fi
+
+# 4. Set Docker awareness flag
 export PHANTOM_DOCKER=true
 
-# 6. Start Phantom (exec replaces shell so signals reach Bun directly)
-echo "[phantom] Starting Phantom..."
+# 5. Start DUSTIN (exec replaces shell so signals reach Bun directly)
+echo "[dustin] Starting DUSTIN..."
 exec bun run src/index.ts

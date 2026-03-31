@@ -7,11 +7,12 @@ const DEFAULT_CONFIG_PATH = "config/memory.yaml";
 
 /**
  * Apply environment variable overrides for Docker and bare-metal compatibility.
- * QDRANT_URL, OLLAMA_URL, and EMBEDDING_MODEL env vars take precedence over YAML config.
+ * QDRANT_URL, QDRANT_API_KEY, OPENAI_API_KEY, and EMBEDDING_MODEL env vars take precedence over YAML config.
  */
 function applyEnvOverrides(config: MemoryConfig): MemoryConfig {
 	const qdrantUrl = process.env.QDRANT_URL;
-	const ollamaUrl = process.env.OLLAMA_URL;
+	const qdrantApiKey = process.env.QDRANT_API_KEY;
+	const openaiApiKey = process.env.OPENAI_API_KEY;
 	const embeddingModel = process.env.EMBEDDING_MODEL;
 
 	return {
@@ -19,10 +20,11 @@ function applyEnvOverrides(config: MemoryConfig): MemoryConfig {
 		qdrant: {
 			...config.qdrant,
 			...(qdrantUrl ? { url: qdrantUrl } : {}),
+			...(qdrantApiKey ? { api_key: qdrantApiKey } : {}),
 		},
-		ollama: {
-			...config.ollama,
-			...(ollamaUrl ? { url: ollamaUrl } : {}),
+		embeddings: {
+			...config.embeddings,
+			...(openaiApiKey ? { api_key: openaiApiKey } : {}),
 			...(embeddingModel ? { model: embeddingModel } : {}),
 		},
 	};

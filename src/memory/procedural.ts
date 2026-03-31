@@ -3,14 +3,16 @@ import { type EmbeddingClient, textToSparseVector } from "./embeddings.ts";
 import type { QdrantClient } from "./qdrant-client.ts";
 import type { Procedure, QdrantSearchResult } from "./types.ts";
 
-const COLLECTION_SCHEMA = {
-	vectors: {
-		description: { size: 768, distance: "Cosine" },
-	},
-	sparse_vectors: {
-		text_bm25: {},
-	},
-} as const;
+function collectionSchema(dimensions: number) {
+	return {
+		vectors: {
+			description: { size: dimensions, distance: "Cosine" },
+		},
+		sparse_vectors: {
+			text_bm25: {},
+		},
+	};
+}
 
 const PAYLOAD_INDEXES: { field: string; type: "keyword" | "integer" | "float" }[] = [
 	{ field: "name", type: "keyword" },
@@ -24,17 +26,20 @@ export class ProceduralStore {
 	private qdrant: QdrantClient;
 	private embedder: EmbeddingClient;
 	private collectionName: string;
+	private dimensions: number;
 
 	constructor(qdrant: QdrantClient, embedder: EmbeddingClient, config: MemoryConfig) {
 		this.qdrant = qdrant;
 		this.embedder = embedder;
 		this.collectionName = config.collections.procedures;
+		this.dimensions = config.embedding.dimensions;
 	}
 
 	async initialize(): Promise<void> {
+		const schema = collectionSchema(this.dimensions);
 		await this.qdrant.createCollection(this.collectionName, {
-			vectors: { ...COLLECTION_SCHEMA.vectors },
-			sparse_vectors: { ...COLLECTION_SCHEMA.sparse_vectors },
+			vectors: { ...schema.vectors },
+			sparse_vectors: { ...schema.sparse_vectors },
 		});
 
 		for (const index of PAYLOAD_INDEXES) {

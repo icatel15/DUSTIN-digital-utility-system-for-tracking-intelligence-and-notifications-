@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
@@ -9,7 +9,7 @@ import type { MemorySystem } from "../memory/system.ts";
 
 export type ToolDependencies = {
 	config: PhantomConfig;
-	db: Database;
+	db: SupabaseClient;
 	startedAt: number;
 	runtime: AgentRuntime;
 	memory: MemorySystem | null;
@@ -40,21 +40,27 @@ function registerPhantomStatus(server: McpServer, deps: ToolDependencies): void 
 			const activeSessions = deps.runtime.getActiveSessionCount();
 			const generation = deps.evolution?.getCurrentVersion() ?? 0;
 
-			const costRow = deps.db
-				.query("SELECT COALESCE(SUM(cost_usd), 0) as total FROM cost_events WHERE created_at >= date('now')")
-				.get() as { total: number } | null;
+			const { data: costData } = await deps.db
+				.from("cost_events")
+				.select("cost_usd")
+				.gte("created_at", new Date(new Date().toISOString().slice(0, 10)).toISOString());
 
-			const queueRow = deps.db
-				.query("SELECT COUNT(*) as count FROM tasks WHERE status IN ('queued', 'active')")
-				.get() as { count: number } | null;
+			const totalCost = (costData ?? []).reduce((sum, row) => sum + (row.cost_usd ?? 0), 0);
+
+			const { data: queueData } = await deps.db
+				.from("tasks")
+				.select("id")
+				.in("status", ["queued", "active"]);
+
+			const queueDepth = queueData?.length ?? 0;
 
 			const status = {
 				state: activeSessions > 0 ? "working" : "idle",
 				currentTask: null,
-				queueDepth: queueRow?.count ?? 0,
+				queueDepth,
 				activeSessions,
 				uptimeHours: +(uptimeSeconds / 3600).toFixed(2),
-				costToday: +(costRow?.total ?? 0).toFixed(4),
+				costToday: +totalCost.toFixed(4),
 				evolutionGeneration: generation,
 			};
 
@@ -138,26 +144,36 @@ function registerPhantomMetrics(server: McpServer, deps: ToolDependencies): void
 		async ({ period }): Promise<CallToolResult> => {
 			const metrics = deps.evolution?.getMetrics();
 
-			const dateFilter =
-				period === "today"
-					? "date('now')"
-					: period === "week"
-						? "date('now', '-7 days')"
-						: period === "month"
-							? "date('now', '-30 days')"
-							: "date('1970-01-01')";
+			const now = new Date();
+			let dateFilter: string;
+			if (period === "today") {
+				dateFilter = now.toISOString().slice(0, 10);
+			} else if (period === "week") {
+				const d = new Date(now);
+				d.setDate(d.getDate() - 7);
+				dateFilter = d.toISOString();
+			} else if (period === "month") {
+				const d = new Date(now);
+				d.setDate(d.getDate() - 30);
+				dateFilter = d.toISOString();
+			} else {
+				dateFilter = "1970-01-01T00:00:00.000Z";
+			}
 
-			const costRow = deps.db
-				.query(
-					`SELECT COALESCE(SUM(cost_usd), 0) as total, COUNT(*) as count FROM cost_events WHERE created_at >= ${dateFilter}`,
-				)
-				.get() as { total: number; count: number } | null;
+			const { data: costData } = await deps.db
+				.from("cost_events")
+				.select("cost_usd")
+				.gte("created_at", dateFilter);
+
+			const rows = costData ?? [];
+			const totalCost = rows.reduce((sum, row) => sum + (row.cost_usd ?? 0), 0);
+			const count = rows.length;
 
 			const result = {
 				totalTasks: metrics?.session_count ?? 0,
 				successRate: metrics ? +(metrics.success_rate_7d * 100).toFixed(1) : 0,
-				avgCost: costRow && costRow.count > 0 ? +(costRow.total / costRow.count).toFixed(4) : 0,
-				totalCost: +(costRow?.total ?? 0).toFixed(4),
+				avgCost: count > 0 ? +(totalCost / count).toFixed(4) : 0,
+				totalCost: +totalCost.toFixed(4),
 				evolutionGeneration: deps.evolution?.getCurrentVersion() ?? 0,
 				evolutionCount: metrics?.evolution_count ?? 0,
 				rollbackCount: metrics?.rollback_count ?? 0,
@@ -180,15 +196,13 @@ function registerPhantomHistory(server: McpServer, deps: ToolDependencies): void
 			}),
 		},
 		async ({ limit }): Promise<CallToolResult> => {
-			const sessions = deps.db
-				.query(
-					`SELECT session_key, sdk_session_id, channel_id, conversation_id, status,
-				 total_cost_usd, input_tokens, output_tokens, turn_count, created_at, last_active_at
-				 FROM sessions ORDER BY last_active_at DESC LIMIT ?`,
-				)
-				.all(limit);
+			const { data: sessions } = await deps.db
+				.from("sessions")
+				.select("session_key, sdk_session_id, channel_id, conversation_id, status, total_cost_usd, input_tokens, output_tokens, turn_count, created_at, last_active_at")
+				.order("last_active_at", { ascending: false })
+				.limit(limit);
 
-			return { content: [{ type: "text", text: JSON.stringify({ sessions, count: sessions.length }, null, 2) }] };
+			return { content: [{ type: "text", text: JSON.stringify({ sessions: sessions ?? [], count: (sessions ?? []).length }, null, 2) }] };
 		},
 	);
 }
@@ -288,15 +302,19 @@ function registerPhantomTaskCreate(server: McpServer, deps: ToolDependencies): v
 		async ({ title, description, urgency }): Promise<CallToolResult> => {
 			const id = crypto.randomUUID();
 
-			deps.db.run(
-				`INSERT INTO tasks (id, title, description, urgency, source_channel, status)
-			 VALUES (?, ?, ?, ?, 'mcp', 'queued')`,
-				[id, title, description, urgency],
-			);
+			await deps.db.from("tasks").insert({
+				id,
+				title,
+				description,
+				urgency,
+				source_channel: "mcp",
+				status: "queued",
+			});
 
-			const queueRow = deps.db.query("SELECT COUNT(*) as count FROM tasks WHERE status = 'queued'").get() as {
-				count: number;
-			};
+			const { data: queueData } = await deps.db
+				.from("tasks")
+				.select("id")
+				.eq("status", "queued");
 
 			return {
 				content: [
@@ -306,7 +324,7 @@ function registerPhantomTaskCreate(server: McpServer, deps: ToolDependencies): v
 							{
 								taskId: id,
 								status: "queued",
-								queuePosition: queueRow.count,
+								queuePosition: queueData?.length ?? 0,
 							},
 							null,
 							2,
@@ -328,7 +346,11 @@ function registerPhantomTaskStatus(server: McpServer, deps: ToolDependencies): v
 			}),
 		},
 		async ({ taskId }): Promise<CallToolResult> => {
-			const task = deps.db.query("SELECT * FROM tasks WHERE id = ?").get(taskId) as Record<string, unknown> | null;
+			const { data: task } = await deps.db
+				.from("tasks")
+				.select("*")
+				.eq("id", taskId)
+				.single();
 
 			if (!task) {
 				return { content: [{ type: "text", text: JSON.stringify({ error: "Task not found" }) }], isError: true };

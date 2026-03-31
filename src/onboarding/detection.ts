@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -20,9 +20,13 @@ export function isFirstRun(configDir: string): boolean {
 /**
  * True when onboarding was started but not completed (survives restarts).
  */
-export function isOnboardingInProgress(db: Database): boolean {
-	const row = db.query("SELECT status FROM onboarding_state ORDER BY id DESC LIMIT 1").get() as {
-		status: string;
-	} | null;
-	return row?.status === "in_progress";
+export async function isOnboardingInProgress(db: SupabaseClient): Promise<boolean> {
+	const { data } = await db
+		.from("onboarding_state")
+		.select("status")
+		.order("id", { ascending: false })
+		.limit(1)
+		.maybeSingle();
+
+	return data?.status === "in_progress";
 }

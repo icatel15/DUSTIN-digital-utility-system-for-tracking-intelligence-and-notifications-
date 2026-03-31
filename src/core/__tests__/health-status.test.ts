@@ -6,29 +6,29 @@ import type { MemoryHealth } from "../../memory/types.ts";
  * This must mirror the logic in startServer's /health handler exactly.
  */
 function computeHealthStatus(memory: MemoryHealth): string {
-	const allHealthy = memory.qdrant && memory.ollama;
-	const someHealthy = memory.qdrant || memory.ollama;
+	const allHealthy = memory.qdrant && memory.embeddings;
+	const someHealthy = memory.qdrant || memory.embeddings;
 	return allHealthy ? "ok" : someHealthy ? "degraded" : memory.configured ? "down" : "ok";
 }
 
 describe("health status logic", () => {
 	test("both healthy and configured -> ok", () => {
-		expect(computeHealthStatus({ qdrant: true, ollama: true, configured: true })).toBe("ok");
+		expect(computeHealthStatus({ qdrant: true, embeddings: true, configured: true })).toBe("ok");
 	});
 
-	test("qdrant up, ollama down, configured -> degraded", () => {
-		expect(computeHealthStatus({ qdrant: true, ollama: false, configured: true })).toBe("degraded");
+	test("qdrant up, embeddings down, configured -> degraded", () => {
+		expect(computeHealthStatus({ qdrant: true, embeddings: false, configured: true })).toBe("degraded");
 	});
 
-	test("qdrant down, ollama up, configured -> degraded", () => {
-		expect(computeHealthStatus({ qdrant: false, ollama: true, configured: true })).toBe("degraded");
+	test("qdrant down, embeddings up, configured -> degraded", () => {
+		expect(computeHealthStatus({ qdrant: false, embeddings: true, configured: true })).toBe("degraded");
 	});
 
 	test("both down when configured -> down (the bug fix)", () => {
-		expect(computeHealthStatus({ qdrant: false, ollama: false, configured: true })).toBe("down");
+		expect(computeHealthStatus({ qdrant: false, embeddings: false, configured: true })).toBe("down");
 	});
 
 	test("both down when not configured -> ok (memory intentionally not set up)", () => {
-		expect(computeHealthStatus({ qdrant: false, ollama: false, configured: false })).toBe("ok");
+		expect(computeHealthStatus({ qdrant: false, embeddings: false, configured: false })).toBe("ok");
 	});
 });

@@ -4,14 +4,14 @@ import { EmbeddingClient, textToSparseVector } from "../embeddings.ts";
 
 const TEST_CONFIG: MemoryConfig = {
 	qdrant: { url: "http://localhost:6333" },
-	ollama: { url: "http://localhost:11434", model: "nomic-embed-text" },
+	embeddings: { provider: "openai", api_key: "test-key", model: "text-embedding-3-small" },
 	collections: { episodes: "episodes", semantic_facts: "semantic_facts", procedures: "procedures" },
-	embedding: { dimensions: 768, batch_size: 32 },
+	embedding: { dimensions: 1536, batch_size: 32 },
 	context: { max_tokens: 50000, episode_limit: 10, fact_limit: 20, procedure_limit: 5 },
 };
 
-function make768dVector(): number[] {
-	return Array.from({ length: 768 }, (_, i) => Math.sin(i * 0.01));
+function make1536dVector(): number[] {
+	return Array.from({ length: 1536 }, (_, i) => Math.sin(i * 0.01));
 }
 
 describe("EmbeddingClient", () => {
@@ -21,12 +21,12 @@ describe("EmbeddingClient", () => {
 		globalThis.fetch = originalFetch;
 	});
 
-	test("embed() returns embedding vector from Ollama response", async () => {
-		const mockVector = make768dVector();
+	test("embed() returns embedding vector from OpenAI response", async () => {
+		const mockVector = make1536dVector();
 
 		globalThis.fetch = mock(() =>
 			Promise.resolve(
-				new Response(JSON.stringify({ embeddings: [mockVector] }), {
+				new Response(JSON.stringify({ data: [{ embedding: mockVector, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }), {
 					status: 200,
 					headers: { "Content-Type": "application/json" },
 				}),
@@ -37,22 +37,22 @@ describe("EmbeddingClient", () => {
 		const result = await client.embed("test text");
 
 		expect(result).toEqual(mockVector);
-		expect(result.length).toBe(768);
+		expect(result.length).toBe(1536);
 	});
 
 	test("embed() throws on HTTP error with helpful message", async () => {
 		globalThis.fetch = mock(() =>
-			Promise.resolve(new Response("model not found", { status: 404 })),
+			Promise.resolve(new Response("invalid api key", { status: 401 })),
 		) as unknown as typeof fetch;
 
 		const client = new EmbeddingClient(TEST_CONFIG);
-		await expect(client.embed("test")).rejects.toThrow("Ollama embedding failed (404)");
+		await expect(client.embed("test")).rejects.toThrow("OpenAI embedding failed (401)");
 	});
 
 	test("embed() throws on empty embeddings response", async () => {
 		globalThis.fetch = mock(() =>
 			Promise.resolve(
-				new Response(JSON.stringify({ embeddings: [] }), {
+				new Response(JSON.stringify({ data: [], usage: { prompt_tokens: 0, total_tokens: 0 } }), {
 					status: 200,
 					headers: { "Content-Type": "application/json" },
 				}),
@@ -63,13 +63,13 @@ describe("EmbeddingClient", () => {
 		await expect(client.embed("test")).rejects.toThrow("empty embeddings");
 	});
 
-	test("embedBatch() returns multiple vectors", async () => {
-		const vec1 = make768dVector();
-		const vec2 = make768dVector().map((v) => v + 0.5);
+	test("embedBatch() returns multiple vectors sorted by index", async () => {
+		const vec1 = make1536dVector();
+		const vec2 = make1536dVector().map((v) => v + 0.5);
 
 		globalThis.fetch = mock(() =>
 			Promise.resolve(
-				new Response(JSON.stringify({ embeddings: [vec1, vec2] }), {
+				new Response(JSON.stringify({ data: [{ embedding: vec2, index: 1 }, { embedding: vec1, index: 0 }], usage: { prompt_tokens: 10, total_tokens: 10 } }), {
 					status: 200,
 					headers: { "Content-Type": "application/json" },
 				}),
@@ -85,11 +85,11 @@ describe("EmbeddingClient", () => {
 	});
 
 	test("embedBatch() throws on mismatched count", async () => {
-		const vec1 = make768dVector();
+		const vec1 = make1536dVector();
 
 		globalThis.fetch = mock(() =>
 			Promise.resolve(
-				new Response(JSON.stringify({ embeddings: [vec1] }), {
+				new Response(JSON.stringify({ data: [{ embedding: vec1, index: 0 }], usage: { prompt_tokens: 5, total_tokens: 5 } }), {
 					status: 200,
 					headers: { "Content-Type": "application/json" },
 				}),
@@ -100,20 +100,17 @@ describe("EmbeddingClient", () => {
 		await expect(client.embedBatch(["one", "two", "three"])).rejects.toThrow("1 embeddings for 3 inputs");
 	});
 
-	test("isHealthy() returns true when Ollama is up", async () => {
-		globalThis.fetch = mock(() =>
-			Promise.resolve(new Response(JSON.stringify({ models: [] }), { status: 200 })),
-		) as unknown as typeof fetch;
-
+	test("isHealthy() returns true when API key is set", async () => {
 		const client = new EmbeddingClient(TEST_CONFIG);
 		expect(await client.isHealthy()).toBe(true);
 	});
 
-	test("isHealthy() returns false when Ollama is down", async () => {
-		globalThis.fetch = mock(() => Promise.reject(new Error("ECONNREFUSED"))) as unknown as typeof fetch;
-
-		const client = new EmbeddingClient(TEST_CONFIG);
-		expect(await client.isHealthy()).toBe(false);
+	test("constructor throws when API key is missing", () => {
+		const noKeyConfig: MemoryConfig = {
+			...TEST_CONFIG,
+			embeddings: { provider: "openai", model: "text-embedding-3-small" },
+		};
+		expect(() => new EmbeddingClient(noKeyConfig)).toThrow("API key is required");
 	});
 });
 

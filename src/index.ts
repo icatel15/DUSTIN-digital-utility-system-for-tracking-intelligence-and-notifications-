@@ -78,7 +78,7 @@ async function main(): Promise<void> {
 	setRoleInfoProvider(() => (activeRole ? { id: activeRole.id, name: activeRole.name } : null));
 
 	const db = getDatabase();
-	runMigrations(db);
+	await runMigrations(db);
 	setSecretsDb(db);
 	console.log("[phantom] Database ready");
 
@@ -158,7 +158,7 @@ async function main(): Promise<void> {
 	let mcpServer: PhantomMcpServer | null = null;
 	let scheduler: Scheduler | null = null;
 	try {
-		mcpServer = new PhantomMcpServer({
+		mcpServer = await PhantomMcpServer.create({
 			config,
 			db,
 			startedAt,
@@ -338,14 +338,14 @@ async function main(): Promise<void> {
 
 	// Onboarding detection
 	const configDir = evolution?.getEvolutionConfig().paths.config_dir ?? "phantom-config";
-	const needsOnboarding = isFirstRun(configDir) || isOnboardingInProgress(db);
+	const needsOnboarding = isFirstRun(configDir) || (await isOnboardingInProgress(db));
 	if (needsOnboarding && activeRole) {
 		const onboardingPrompt = buildOnboardingPrompt(activeRole, config.name);
 		runtime.setOnboardingPrompt(onboardingPrompt);
 		console.log("[onboarding] Onboarding prompt injected into agent runtime");
 	}
 
-	setOnboardingStatusProvider(() => getOnboardingStatus(db).status);
+	setOnboardingStatusProvider(async () => (await getOnboardingStatus(db)).status);
 
 	const conversationMessages = new Map<string, { user: string[]; assistant: string[] }>();
 

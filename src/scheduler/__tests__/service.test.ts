@@ -1,6 +1,5 @@
-import { Database } from "bun:sqlite";
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import { runMigrations } from "../../db/migrate.ts";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { createMockSupabase } from "../../db/test-helpers.ts";
 import { Scheduler } from "../service.ts";
 
 function createMockRuntime() {
@@ -29,29 +28,18 @@ function createMockSlackChannel() {
 }
 
 describe("Scheduler", () => {
-	let db: Database;
+	let db: ReturnType<typeof createMockSupabase>;
 	let mockRuntime: ReturnType<typeof createMockRuntime>;
 
-	beforeAll(() => {
-		db = new Database(":memory:");
-		db.run("PRAGMA journal_mode = WAL");
-		db.run("PRAGMA foreign_keys = ON");
-		runMigrations(db);
-	});
-
 	beforeEach(() => {
-		db.run("DELETE FROM scheduled_jobs");
+		db = createMockSupabase();
 		mockRuntime = createMockRuntime();
 	});
 
-	afterAll(() => {
-		db.close();
-	});
+	test("createJob inserts a job and returns it", async () => {
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
 
-	test("createJob inserts a job and returns it", () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
-
-		const job = scheduler.createJob({
+		const job = await scheduler.createJob({
 			name: "Test Job",
 			description: "A test job",
 			schedule: { kind: "every", intervalMs: 60_000 },
@@ -70,11 +58,11 @@ describe("Scheduler", () => {
 		expect(job.delivery).toEqual({ channel: "slack", target: "owner" });
 	});
 
-	test("createJob with at schedule computes correct next run", () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
+	test("createJob with at schedule computes correct next run", async () => {
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
 		const future = new Date(Date.now() + 3_600_000).toISOString();
 
-		const job = scheduler.createJob({
+		const job = await scheduler.createJob({
 			name: "One-shot",
 			schedule: { kind: "at", at: future },
 			task: "Remind me",
@@ -85,10 +73,10 @@ describe("Scheduler", () => {
 		expect(job.deleteAfterRun).toBe(true);
 	});
 
-	test("createJob with cron schedule", () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
+	test("createJob with cron schedule", async () => {
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
 
-		const job = scheduler.createJob({
+		const job = await scheduler.createJob({
 			name: "Daily Report",
 			schedule: { kind: "cron", expr: "0 9 * * 1-5", tz: "America/Los_Angeles" },
 			task: "Summarize PRs",
@@ -98,10 +86,10 @@ describe("Scheduler", () => {
 		expect(job.nextRunAt).toBeTruthy();
 	});
 
-	test("createJob with custom delivery", () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
+	test("createJob with custom delivery", async () => {
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
 
-		const job = scheduler.createJob({
+		const job = await scheduler.createJob({
 			name: "Channel Post",
 			schedule: { kind: "every", intervalMs: 300_000 },
 			task: "Post update",
@@ -111,58 +99,58 @@ describe("Scheduler", () => {
 		expect(job.delivery).toEqual({ channel: "slack", target: "C04ABC123" });
 	});
 
-	test("listJobs returns all jobs", () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
+	test("listJobs returns all jobs", async () => {
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
 
-		scheduler.createJob({ name: "Job 1", schedule: { kind: "every", intervalMs: 60_000 }, task: "Task 1" });
-		scheduler.createJob({ name: "Job 2", schedule: { kind: "every", intervalMs: 120_000 }, task: "Task 2" });
-		scheduler.createJob({ name: "Job 3", schedule: { kind: "every", intervalMs: 180_000 }, task: "Task 3" });
+		await scheduler.createJob({ name: "Job 1", schedule: { kind: "every", intervalMs: 60_000 }, task: "Task 1" });
+		await scheduler.createJob({ name: "Job 2", schedule: { kind: "every", intervalMs: 120_000 }, task: "Task 2" });
+		await scheduler.createJob({ name: "Job 3", schedule: { kind: "every", intervalMs: 180_000 }, task: "Task 3" });
 
-		const jobs = scheduler.listJobs();
+		const jobs = await scheduler.listJobs();
 		expect(jobs.length).toBe(3);
 	});
 
-	test("getJob returns a specific job by ID", () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
-		const created = scheduler.createJob({
+	test("getJob returns a specific job by ID", async () => {
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
+		const created = await scheduler.createJob({
 			name: "Findable",
 			schedule: { kind: "every", intervalMs: 60_000 },
 			task: "Find me",
 		});
 
-		const found = scheduler.getJob(created.id);
+		const found = await scheduler.getJob(created.id);
 		expect(found).not.toBeNull();
 		expect(found?.name).toBe("Findable");
 	});
 
-	test("getJob returns null for non-existent ID", () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
-		const found = scheduler.getJob("non-existent-id");
+	test("getJob returns null for non-existent ID", async () => {
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
+		const found = await scheduler.getJob("non-existent-id");
 		expect(found).toBeNull();
 	});
 
-	test("deleteJob removes a job", () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
-		const job = scheduler.createJob({
+	test("deleteJob removes a job", async () => {
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
+		const job = await scheduler.createJob({
 			name: "Deletable",
 			schedule: { kind: "every", intervalMs: 60_000 },
 			task: "Delete me",
 		});
 
-		const deleted = scheduler.deleteJob(job.id);
+		const deleted = await scheduler.deleteJob(job.id);
 		expect(deleted).toBe(true);
-		expect(scheduler.getJob(job.id)).toBeNull();
+		expect(await scheduler.getJob(job.id)).toBeNull();
 	});
 
-	test("deleteJob returns false for non-existent ID", () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
-		const deleted = scheduler.deleteJob("non-existent-id");
+	test("deleteJob returns false for non-existent ID", async () => {
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
+		const deleted = await scheduler.deleteJob("non-existent-id");
 		expect(deleted).toBe(false);
 	});
 
 	test("runJobNow executes the job and calls runtime", async () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
-		const job = scheduler.createJob({
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
+		const job = await scheduler.createJob({
 			name: "Immediate",
 			schedule: { kind: "every", intervalMs: 60_000 },
 			task: "Run now",
@@ -174,8 +162,8 @@ describe("Scheduler", () => {
 	});
 
 	test("runJobNow updates job state after execution", async () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
-		const job = scheduler.createJob({
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
+		const job = await scheduler.createJob({
 			name: "Tracked",
 			schedule: { kind: "every", intervalMs: 60_000 },
 			task: "Track me",
@@ -183,7 +171,7 @@ describe("Scheduler", () => {
 
 		await scheduler.runJobNow(job.id);
 
-		const updated = scheduler.getJob(job.id);
+		const updated = await scheduler.getJob(job.id);
 		expect(updated?.runCount).toBe(1);
 		expect(updated?.lastRunAt).toBeTruthy();
 		expect(updated?.lastRunStatus).toBe("ok");
@@ -193,13 +181,13 @@ describe("Scheduler", () => {
 	test("runJobNow delivers result to Slack owner", async () => {
 		const mockSlack = createMockSlackChannel();
 		const scheduler = new Scheduler({
-			db,
+			db: db as any,
 			runtime: mockRuntime as never,
 			slackChannel: mockSlack as never,
 			ownerUserId: "U_OWNER",
 		});
 
-		const job = scheduler.createJob({
+		const job = await scheduler.createJob({
 			name: "Delivered",
 			schedule: { kind: "every", intervalMs: 60_000 },
 			task: "Deliver me",
@@ -212,13 +200,13 @@ describe("Scheduler", () => {
 	test("runJobNow delivers to specific channel", async () => {
 		const mockSlack = createMockSlackChannel();
 		const scheduler = new Scheduler({
-			db,
+			db: db as any,
 			runtime: mockRuntime as never,
 			slackChannel: mockSlack as never,
 			ownerUserId: "U_OWNER",
 		});
 
-		const job = scheduler.createJob({
+		const job = await scheduler.createJob({
 			name: "Channel Post",
 			schedule: { kind: "every", intervalMs: 60_000 },
 			task: "Post to channel",
@@ -232,13 +220,13 @@ describe("Scheduler", () => {
 	test("runJobNow with delivery=none does not call Slack", async () => {
 		const mockSlack = createMockSlackChannel();
 		const scheduler = new Scheduler({
-			db,
+			db: db as any,
 			runtime: mockRuntime as never,
 			slackChannel: mockSlack as never,
 			ownerUserId: "U_OWNER",
 		});
 
-		const job = scheduler.createJob({
+		const job = await scheduler.createJob({
 			name: "Silent",
 			schedule: { kind: "every", intervalMs: 60_000 },
 			task: "Silent task",
@@ -251,7 +239,7 @@ describe("Scheduler", () => {
 	});
 
 	test("runJobNow throws for non-existent job", async () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
 		await expect(scheduler.runJobNow("non-existent")).rejects.toThrow("Job not found");
 	});
 
@@ -264,8 +252,8 @@ describe("Scheduler", () => {
 			durationMs: 100,
 		}));
 
-		const scheduler = new Scheduler({ db, runtime: errorRuntime as never });
-		const job = scheduler.createJob({
+		const scheduler = new Scheduler({ db: db as any, runtime: errorRuntime as never });
+		const job = await scheduler.createJob({
 			name: "Failing",
 			schedule: { kind: "every", intervalMs: 60_000 },
 			task: "Fail please",
@@ -274,13 +262,13 @@ describe("Scheduler", () => {
 		const result = await scheduler.runJobNow(job.id);
 		expect(result).toBe("Error: Something went wrong");
 
-		const updated = scheduler.getJob(job.id);
+		const updated = await scheduler.getJob(job.id);
 		expect(updated?.lastRunStatus).toBe("error");
 		expect(updated?.consecutiveErrors).toBe(1);
 	});
 
 	test("start and stop lifecycle", async () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
 		expect(scheduler.isRunning()).toBe(false);
 
 		await scheduler.start();
@@ -290,27 +278,27 @@ describe("Scheduler", () => {
 		expect(scheduler.isRunning()).toBe(false);
 	});
 
-	test("jobs persist across scheduler instances", () => {
-		const scheduler1 = new Scheduler({ db, runtime: mockRuntime as never });
-		const job = scheduler1.createJob({
+	test("jobs persist across scheduler instances", async () => {
+		const scheduler1 = new Scheduler({ db: db as any, runtime: mockRuntime as never });
+		const job = await scheduler1.createJob({
 			name: "Persistent",
 			schedule: { kind: "every", intervalMs: 60_000 },
 			task: "Persist",
 		});
 
-		const scheduler2 = new Scheduler({ db, runtime: mockRuntime as never });
-		const found = scheduler2.getJob(job.id);
+		const scheduler2 = new Scheduler({ db: db as any, runtime: mockRuntime as never });
+		const found = await scheduler2.getJob(job.id);
 		expect(found).not.toBeNull();
 		expect(found?.name).toBe("Persistent");
 	});
 
 	test("setSlackChannel updates delivery target", async () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
 		const mockSlack = createMockSlackChannel();
 
 		scheduler.setSlackChannel(mockSlack as never, "U_LATE_OWNER");
 
-		const job = scheduler.createJob({
+		const job = await scheduler.createJob({
 			name: "Late Slack",
 			schedule: { kind: "every", intervalMs: 60_000 },
 			task: "Late delivery",
@@ -321,10 +309,10 @@ describe("Scheduler", () => {
 	});
 
 	test("at schedule job is marked completed after run", async () => {
-		const scheduler = new Scheduler({ db, runtime: mockRuntime as never });
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
 		const future = new Date(Date.now() + 3_600_000).toISOString();
 
-		const job = scheduler.createJob({
+		const job = await scheduler.createJob({
 			name: "One-shot reminder",
 			schedule: { kind: "at", at: future },
 			task: "Remind me",
@@ -332,7 +320,7 @@ describe("Scheduler", () => {
 
 		await scheduler.runJobNow(job.id);
 
-		const updated = scheduler.getJob(job.id);
+		const updated = await scheduler.getJob(job.id);
 		expect(updated?.status).toBe("completed");
 	});
 });

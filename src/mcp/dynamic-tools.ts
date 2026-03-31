@@ -1,19 +1,8 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { executeDynamicHandler } from "./dynamic-handlers.ts";
-
-const DYNAMIC_TOOLS_MIGRATION = `CREATE TABLE IF NOT EXISTS dynamic_tools (
-	name TEXT PRIMARY KEY,
-	description TEXT NOT NULL,
-	input_schema TEXT NOT NULL,
-	handler_type TEXT NOT NULL DEFAULT 'inline',
-	handler_code TEXT,
-	handler_path TEXT,
-	registered_at TEXT NOT NULL DEFAULT (datetime('now')),
-	registered_by TEXT
-)`;
 
 export type DynamicToolRow = {
 	name: string;
@@ -52,17 +41,22 @@ const RegisterToolInputSchema = z.object({
 });
 
 export class DynamicToolRegistry {
-	private db: Database;
+	private db: SupabaseClient;
 	private tools: Map<string, DynamicToolDef> = new Map();
 
-	constructor(db: Database) {
+	constructor(db: SupabaseClient) {
 		this.db = db;
-		this.db.run(DYNAMIC_TOOLS_MIGRATION);
-		this.loadFromDatabase();
 	}
 
-	private loadFromDatabase(): void {
-		const rows = this.db.query("SELECT * FROM dynamic_tools").all() as DynamicToolRow[];
+	async loadFromDatabase(): Promise<void> {
+		const { data, error } = await this.db.from("dynamic_tools").select("*");
+
+		if (error) {
+			console.warn(`[dynamic-tools] Failed to load tools from database: ${error.message}`);
+			return;
+		}
+
+		const rows = (data ?? []) as DynamicToolRow[];
 		for (const row of rows) {
 			try {
 				const def: DynamicToolDef = {
@@ -86,7 +80,7 @@ export class DynamicToolRegistry {
 		}
 	}
 
-	register(input: z.infer<typeof RegisterToolInputSchema>): DynamicToolDef {
+	async register(input: z.infer<typeof RegisterToolInputSchema>): Promise<DynamicToolDef> {
 		const parsed = RegisterToolInputSchema.parse(input);
 
 		if (parsed.handler_type === "script" && !parsed.handler_path) {
@@ -105,27 +99,31 @@ export class DynamicToolRegistry {
 			handlerPath: parsed.handler_path,
 		};
 
-		this.db.run(
-			`INSERT OR REPLACE INTO dynamic_tools (name, description, input_schema, handler_type, handler_code, handler_path)
-			 VALUES (?, ?, ?, ?, ?, ?)`,
-			[
-				def.name,
-				def.description,
-				JSON.stringify(def.inputSchema),
-				def.handlerType,
-				def.handlerCode ?? null,
-				def.handlerPath ?? null,
-			],
+		const { error } = await this.db.from("dynamic_tools").upsert(
+			{
+				name: def.name,
+				description: def.description,
+				input_schema: JSON.stringify(def.inputSchema),
+				handler_type: def.handlerType,
+				handler_code: def.handlerCode ?? null,
+				handler_path: def.handlerPath ?? null,
+			},
+			{ onConflict: "name" },
 		);
+
+		if (error) throw new Error(`Failed to register tool '${def.name}': ${error.message}`);
 
 		this.tools.set(def.name, def);
 		console.log(`[dynamic-tools] Registered tool: ${def.name}`);
 		return def;
 	}
 
-	unregister(name: string): boolean {
+	async unregister(name: string): Promise<boolean> {
 		if (!this.tools.has(name)) return false;
-		this.db.run("DELETE FROM dynamic_tools WHERE name = ?", [name]);
+
+		const { error } = await this.db.from("dynamic_tools").delete().eq("name", name);
+		if (error) throw new Error(`Failed to unregister tool '${name}': ${error.message}`);
+
 		this.tools.delete(name);
 		console.log(`[dynamic-tools] Unregistered tool: ${name}`);
 		return true;

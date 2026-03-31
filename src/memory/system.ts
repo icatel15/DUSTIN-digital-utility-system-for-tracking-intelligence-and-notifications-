@@ -30,8 +30,8 @@ export class MemorySystem {
 			return;
 		}
 
-		if (!health.ollama) {
-			console.warn("[memory] Ollama is not available. Memory system running in degraded mode.");
+		if (!health.embeddings) {
+			console.warn("[memory] Embedding service is not available. Memory system running in degraded mode.");
 			return;
 		}
 
@@ -56,8 +56,8 @@ export class MemorySystem {
 	}
 
 	async healthCheck(): Promise<MemoryHealth> {
-		const [qdrant, ollama] = await Promise.all([this.qdrant.isHealthy(), this.embedder.isHealthy()]);
-		return { qdrant, ollama, configured: true };
+		const [qdrant, embeddings] = await Promise.all([this.qdrant.isHealthy(), this.embedder.isHealthy()]);
+		return { qdrant, embeddings, configured: true };
 	}
 
 	// Episodic memory

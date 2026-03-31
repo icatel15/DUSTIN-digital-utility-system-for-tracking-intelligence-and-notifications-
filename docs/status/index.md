@@ -12,32 +12,31 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 
 ## Current State
 
-- Phantom v0.18.1 merged into DUSTIN repo (789 tests passing)
-- Full docs suite created (tech-stack, schema, conventions, glossary, directory)
-- Codebase recon complete — Qdrant and Ollama cleanly abstracted, SQLite moderately coupled
-- Phase 1 feature doc written with 20 acceptance criteria across 3 workstreams
-- Ready to begin Phase 1 implementation
+- Phase 1 complete: all managed services wired (Qdrant Cloud, OpenAI embeddings, Supabase)
+- 789 tests passing, zero `bun:sqlite` in production code
+- Docker Compose stripped to DUSTIN container only (no Qdrant/Ollama)
+- Supabase migration files created for all 14 tables (9 Phantom + 5 DUSTIN)
+- Ready to begin Phase 2 (Telegram channel + two-user support)
 
 ## Active Phase File
 
-`docs/status/phase-1.md`
+`docs/status/phase-2.md` (to be created)
 
 ## Phase Roadmap
 
 | Phase | Name | Status |
 |-------|------|--------|
 | 0 | Setup & Documentation | [x] Complete |
-| 1 | Data Layer Swap (Qdrant Cloud, OpenAI embeddings, Supabase) | [ ] Not started |
+| 1 | Data Layer Swap (Qdrant Cloud, OpenAI embeddings, Supabase) | [x] Complete |
 | 2 | Channel Configuration (Telegram, Resend, Webhook) | [ ] Not started |
 | 3 | Notion Integration | [ ] Not started |
 | 4 | DUSTIN Persona & Evolution Customization | [ ] Not started |
 
 ## Next Steps
 
-1. User approves Phase 1 feature doc (`docs/phase-1-data-layer-swap.md`)
-2. Set up external services (Qdrant Cloud account, Supabase project, OpenAI API key)
-3. Begin WS-1 + WS-2 (memory module: Qdrant Cloud + OpenAI embeddings)
-4. Begin WS-3 (database module: SQLite → Supabase)
+1. Set up external services (Qdrant Cloud, Supabase project, OpenAI API key) and run `supabase db push`
+2. Write Phase 2 feature doc (Telegram channel + two-user support)
+3. Begin Phase 2 implementation
 
 ## Open Decisions
 

@@ -1,6 +1,5 @@
-import { Database } from "bun:sqlite";
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { runMigrations } from "../../db/migrate.ts";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { createMockSupabase } from "../../db/test-helpers.ts";
 import type { RoleTemplate } from "../../roles/types.ts";
 import { type OnboardingTarget, startOnboarding } from "../flow.ts";
 import type { SlackProfileClient } from "../profiler.ts";
@@ -65,24 +64,17 @@ function createMockSlackClient(): SlackProfileClient {
 }
 
 describe("startOnboarding", () => {
-	let db: Database;
+	let db: ReturnType<typeof createMockSupabase>;
 
 	beforeEach(() => {
-		db = new Database(":memory:");
-		db.run("PRAGMA journal_mode = WAL");
-		db.run("PRAGMA foreign_keys = ON");
-		runMigrations(db);
-	});
-
-	afterEach(() => {
-		db.close();
+		db = createMockSupabase();
 	});
 
 	test("posts intro to channel when target is channel", async () => {
 		const slack = createMockSlack();
 		const target: OnboardingTarget = { type: "channel", channelId: "C04ABC123" };
 
-		await startOnboarding(slack as never, target, "Scout", mockRole, db);
+		await startOnboarding(slack as never, target, "Scout", mockRole, db as any);
 
 		expect(slack.postToChannel).toHaveBeenCalledTimes(1);
 		const [channelId, text] = slack.postToChannel.mock.calls[0];
@@ -95,7 +87,7 @@ describe("startOnboarding", () => {
 		const slack = createMockSlack();
 		const target: OnboardingTarget = { type: "dm", userId: "U04XYZ789" };
 
-		await startOnboarding(slack as never, target, "Scout", mockRole, db);
+		await startOnboarding(slack as never, target, "Scout", mockRole, db as any);
 
 		expect(slack.sendDm).toHaveBeenCalledTimes(1);
 		const [userId, text] = slack.sendDm.mock.calls[0];
@@ -107,9 +99,9 @@ describe("startOnboarding", () => {
 		const slack = createMockSlack();
 		const target: OnboardingTarget = { type: "channel", channelId: "C04ABC123" };
 
-		await startOnboarding(slack as never, target, "Scout", mockRole, db);
+		await startOnboarding(slack as never, target, "Scout", mockRole, db as any);
 
-		const status = getOnboardingStatus(db);
+		const status = await getOnboardingStatus(db as any);
 		expect(status.status).toBe("in_progress");
 	});
 
@@ -117,7 +109,7 @@ describe("startOnboarding", () => {
 		const slack = createMockSlack();
 		const target: OnboardingTarget = { type: "channel", channelId: "C04ABC123" };
 
-		await startOnboarding(slack as never, target, "Scout", mockRole, db);
+		await startOnboarding(slack as never, target, "Scout", mockRole, db as any);
 
 		const text = slack.postToChannel.mock.calls[0][1] as string;
 		expect(text).toContain("Hey there. I'm Scout");
@@ -129,7 +121,7 @@ describe("startOnboarding", () => {
 		const slack = createMockSlack();
 		const target: OnboardingTarget = { type: "dm", userId: "U04XYZ789" };
 
-		await startOnboarding(slack as never, target, "Atlas", mockRole, db);
+		await startOnboarding(slack as never, target, "Atlas", mockRole, db as any);
 
 		const text = slack.sendDm.mock.calls[0][1] as string;
 		expect(text).toContain("Atlas");
@@ -140,7 +132,7 @@ describe("startOnboarding", () => {
 		const slack = createMockSlack();
 		const target: OnboardingTarget = { type: "channel", channelId: "C04ABC123" };
 
-		await startOnboarding(slack as never, target, "Scout", mockRole, db);
+		await startOnboarding(slack as never, target, "Scout", mockRole, db as any);
 
 		expect(slack.sendDm).not.toHaveBeenCalled();
 	});
@@ -149,24 +141,17 @@ describe("startOnboarding", () => {
 		const slack = createMockSlack();
 		const target: OnboardingTarget = { type: "dm", userId: "U04XYZ789" };
 
-		await startOnboarding(slack as never, target, "Scout", mockRole, db);
+		await startOnboarding(slack as never, target, "Scout", mockRole, db as any);
 
 		expect(slack.postToChannel).not.toHaveBeenCalled();
 	});
 });
 
 describe("startOnboarding with profiling", () => {
-	let db: Database;
+	let db: ReturnType<typeof createMockSupabase>;
 
 	beforeEach(() => {
-		db = new Database(":memory:");
-		db.run("PRAGMA journal_mode = WAL");
-		db.run("PRAGMA foreign_keys = ON");
-		runMigrations(db);
-	});
-
-	afterEach(() => {
-		db.close();
+		db = createMockSupabase();
 	});
 
 	test("sends personalized DM when profile is available", async () => {
@@ -174,7 +159,7 @@ describe("startOnboarding with profiling", () => {
 		const client = createMockSlackClient();
 		const target: OnboardingTarget = { type: "dm", userId: "U0A9P3CC5EE" };
 
-		await startOnboarding(slack as never, target, "Scout", mockRole, db, client);
+		await startOnboarding(slack as never, target, "Scout", mockRole, db as any, client);
 
 		expect(slack.sendDm).toHaveBeenCalledTimes(1);
 		const text = slack.sendDm.mock.calls[0][1] as string;
@@ -188,7 +173,7 @@ describe("startOnboarding with profiling", () => {
 		const client = createMockSlackClient();
 		const target: OnboardingTarget = { type: "dm", userId: "U0A9P3CC5EE" };
 
-		await startOnboarding(slack as never, target, "Scout", mockRole, db, client);
+		await startOnboarding(slack as never, target, "Scout", mockRole, db as any, client);
 
 		const text = slack.sendDm.mock.calls[0][1] as string;
 		expect(text).toContain("Ghostwright");
@@ -200,7 +185,7 @@ describe("startOnboarding with profiling", () => {
 		const client = createMockSlackClient();
 		const target: OnboardingTarget = { type: "dm", userId: "U0A9P3CC5EE" };
 
-		const profile = await startOnboarding(slack as never, target, "Scout", mockRole, db, client);
+		const profile = await startOnboarding(slack as never, target, "Scout", mockRole, db as any, client);
 
 		expect(profile).not.toBeNull();
 		expect(profile?.name).toBe("Cheema");
@@ -221,7 +206,7 @@ describe("startOnboarding with profiling", () => {
 		};
 		const target: OnboardingTarget = { type: "dm", userId: "U04XYZ789" };
 
-		const profile = await startOnboarding(slack as never, target, "Scout", mockRole, db, failingClient);
+		const profile = await startOnboarding(slack as never, target, "Scout", mockRole, db as any, failingClient);
 
 		const text = slack.sendDm.mock.calls[0][1] as string;
 		// Generic fallback when profile has no real data
@@ -234,7 +219,7 @@ describe("startOnboarding with profiling", () => {
 		const client = createMockSlackClient();
 		const target: OnboardingTarget = { type: "channel", channelId: "C04ABC123" };
 
-		await startOnboarding(slack as never, target, "Scout", mockRole, db, client);
+		await startOnboarding(slack as never, target, "Scout", mockRole, db as any, client);
 
 		expect(client.users.info).not.toHaveBeenCalled();
 	});
@@ -243,7 +228,7 @@ describe("startOnboarding with profiling", () => {
 		const slack = createMockSlack();
 		const target: OnboardingTarget = { type: "channel", channelId: "C04ABC123" };
 
-		const profile = await startOnboarding(slack as never, target, "Scout", mockRole, db);
+		const profile = await startOnboarding(slack as never, target, "Scout", mockRole, db as any);
 
 		expect(profile).toBeNull();
 	});

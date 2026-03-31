@@ -1,22 +1,18 @@
-import { Database } from "bun:sqlite";
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
+import { createMockSupabase } from "../../db/test-helpers.ts";
 import { AuditLogger } from "../audit.ts";
 
 describe("AuditLogger", () => {
-	let db: Database;
+	let db: ReturnType<typeof createMockSupabase>;
 	let audit: AuditLogger;
 
 	beforeAll(() => {
-		db = new Database(":memory:");
-		audit = new AuditLogger(db);
+		db = createMockSupabase();
+		audit = new AuditLogger(db as any);
 	});
 
-	afterAll(() => {
-		db.close();
-	});
-
-	test("logs an entry", () => {
-		audit.log({
+	test("logs an entry", async () => {
+		await audit.log({
 			client_name: "test-client",
 			method: "tools/call",
 			tool_name: "phantom_status",
@@ -28,7 +24,7 @@ describe("AuditLogger", () => {
 			status: "success",
 		});
 
-		const entries = audit.getRecent(10);
+		const entries = await audit.getRecent(10);
 		expect(entries.length).toBe(1);
 		expect(entries[0].client_name).toBe("test-client");
 		expect(entries[0].method).toBe("tools/call");
@@ -36,8 +32,8 @@ describe("AuditLogger", () => {
 		expect(entries[0].status).toBe("success");
 	});
 
-	test("logs multiple entries and returns in desc order", () => {
-		audit.log({
+	test("logs multiple entries and returns in desc order", async () => {
+		await audit.log({
 			client_name: "client-a",
 			method: "tools/call",
 			tool_name: "phantom_ask",
@@ -49,7 +45,7 @@ describe("AuditLogger", () => {
 			status: "success",
 		});
 
-		audit.log({
+		await audit.log({
 			client_name: "client-b",
 			method: "resources/read",
 			tool_name: null,
@@ -61,21 +57,21 @@ describe("AuditLogger", () => {
 			status: "success",
 		});
 
-		const entries = audit.getRecent(10);
+		const entries = await audit.getRecent(10);
 		// Should have 3 total (1 from first test + 2 from this)
 		expect(entries.length).toBe(3);
 		// Most recent first
 		expect(entries[0].client_name).toBe("client-b");
 	});
 
-	test("getByClient filters correctly", () => {
-		const clientBEntries = audit.getByClient("client-b");
+	test("getByClient filters correctly", async () => {
+		const clientBEntries = await audit.getByClient("client-b");
 		expect(clientBEntries.length).toBe(1);
 		expect(clientBEntries[0].resource_uri).toBe("phantom://health");
 	});
 
-	test("logs error entries", () => {
-		audit.log({
+	test("logs error entries", async () => {
+		await audit.log({
 			client_name: "bad-client",
 			method: "tools/call",
 			tool_name: "phantom_ask",
@@ -87,14 +83,14 @@ describe("AuditLogger", () => {
 			status: "error",
 		});
 
-		const entries = audit.getByClient("bad-client");
+		const entries = await audit.getByClient("bad-client");
 		expect(entries.length).toBe(1);
 		expect(entries[0].status).toBe("error");
 	});
 
-	test("truncates long input summaries", () => {
+	test("truncates long input summaries", async () => {
 		const longInput = "x".repeat(1000);
-		audit.log({
+		await audit.log({
 			client_name: "truncate-test",
 			method: "tools/call",
 			tool_name: "phantom_ask",
@@ -106,7 +102,7 @@ describe("AuditLogger", () => {
 			status: "success",
 		});
 
-		const entries = audit.getByClient("truncate-test");
+		const entries = await audit.getByClient("truncate-test");
 		expect(entries[0].input_summary?.length).toBeLessThanOrEqual(500);
 	});
 });

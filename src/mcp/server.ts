@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AgentRuntime } from "../agent/runtime.ts";
 import type { PhantomConfig } from "../config/types.ts";
@@ -15,24 +15,9 @@ import { registerSweTools } from "./tools-swe.ts";
 import { type ToolDependencies, registerUniversalTools } from "./tools-universal.ts";
 import { McpTransportManager } from "./transport.ts";
 
-const TASKS_MIGRATION = `CREATE TABLE IF NOT EXISTS tasks (
-	id TEXT PRIMARY KEY,
-	title TEXT NOT NULL,
-	description TEXT NOT NULL,
-	status TEXT NOT NULL DEFAULT 'queued',
-	urgency TEXT NOT NULL DEFAULT 'normal',
-	source_channel TEXT,
-	source_client TEXT,
-	result TEXT,
-	cost_usd REAL DEFAULT 0,
-	created_at TEXT NOT NULL DEFAULT (datetime('now')),
-	started_at TEXT,
-	completed_at TEXT
-)`;
-
 export type PhantomMcpServerDeps = {
 	config: PhantomConfig;
-	db: Database;
+	db: SupabaseClient;
 	startedAt: number;
 	runtime: AgentRuntime;
 	memory: MemorySystem | null;
@@ -49,19 +34,41 @@ export class PhantomMcpServer {
 	private roleId: string;
 	private dynamicTools: DynamicToolRegistry;
 
-	constructor(deps: PhantomMcpServerDeps, mcpConfigPath?: string) {
+	private constructor(
+		auth: AuthMiddleware,
+		rateLimiter: RateLimiter,
+		audit: AuditLogger,
+		transportManager: McpTransportManager,
+		toolDeps: ToolDependencies,
+		roleId: string,
+		dynamicTools: DynamicToolRegistry,
+	) {
+		this.auth = auth;
+		this.rateLimiter = rateLimiter;
+		this.audit = audit;
+		this.transportManager = transportManager;
+		this.toolDeps = toolDeps;
+		this.roleId = roleId;
+		this.dynamicTools = dynamicTools;
+
+		// Periodic cleanup every 5 minutes
+		setInterval(() => {
+			this.transportManager.cleanupStaleSessions();
+			this.rateLimiter.cleanup();
+		}, 300_000);
+	}
+
+	static async create(deps: PhantomMcpServerDeps, mcpConfigPath?: string): Promise<PhantomMcpServer> {
 		const mcpConfig = loadMcpConfig(mcpConfigPath);
 
-		// Run tasks migration
-		deps.db.run(TASKS_MIGRATION);
+		const auth = new AuthMiddleware(mcpConfig);
+		const rateLimiter = new RateLimiter(mcpConfig.rate_limit);
+		const audit = new AuditLogger(deps.db);
+		const roleId = deps.roleId ?? deps.config.role;
+		const dynamicTools = new DynamicToolRegistry(deps.db);
+		await dynamicTools.loadFromDatabase();
 
-		this.auth = new AuthMiddleware(mcpConfig);
-		this.rateLimiter = new RateLimiter(mcpConfig.rate_limit);
-		this.audit = new AuditLogger(deps.db);
-		this.roleId = deps.roleId ?? deps.config.role;
-		this.dynamicTools = new DynamicToolRegistry(deps.db);
-
-		this.toolDeps = {
+		const toolDeps: ToolDependencies = {
 			config: deps.config,
 			db: deps.db,
 			startedAt: deps.startedAt,
@@ -70,13 +77,19 @@ export class PhantomMcpServer {
 			evolution: deps.evolution,
 		};
 
-		this.transportManager = new McpTransportManager(() => this.createMcpServer());
+		const server = new PhantomMcpServer(
+			auth,
+			rateLimiter,
+			audit,
+			null as unknown as McpTransportManager, // placeholder, set below
+			toolDeps,
+			roleId,
+			dynamicTools,
+		);
 
-		// Periodic cleanup every 5 minutes
-		setInterval(() => {
-			this.transportManager.cleanupStaleSessions();
-			this.rateLimiter.cleanup();
-		}, 300_000);
+		server.transportManager = new McpTransportManager(() => server.createMcpServer());
+
+		return server;
 	}
 
 	private createMcpServer(): McpServer {
@@ -118,7 +131,7 @@ export class PhantomMcpServer {
 		// Authenticate
 		const auth = await this.auth.authenticate(req);
 		if (!auth.authenticated) {
-			this.audit.log({
+			await this.audit.log({
 				client_name: "unauthenticated",
 				method: req.method,
 				tool_name: null,
@@ -139,7 +152,7 @@ export class PhantomMcpServer {
 		// Rate limit
 		const rateResult = this.rateLimiter.check(auth.clientName);
 		if (!rateResult.allowed) {
-			this.audit.log({
+			await this.audit.log({
 				client_name: auth.clientName,
 				method: req.method,
 				tool_name: null,
@@ -174,7 +187,7 @@ export class PhantomMcpServer {
 			inputSummary: null as string | null,
 		}));
 
-		this.audit.log({
+		await this.audit.log({
 			client_name: auth.clientName,
 			method: auditInfo.method,
 			tool_name: auditInfo.toolName,
@@ -197,7 +210,7 @@ export class PhantomMcpServer {
 		return this.transportManager.getSessionCount();
 	}
 
-	getAuditLog(limit = 50): import("./types.ts").AuditEntry[] {
+	async getAuditLog(limit = 50): Promise<import("./types.ts").AuditEntry[]> {
 		return this.audit.getRecent(limit);
 	}
 

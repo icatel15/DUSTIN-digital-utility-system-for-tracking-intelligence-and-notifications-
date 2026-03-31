@@ -1,11 +1,11 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import type { McpSdkServerConfigWithInstance } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { createSecretRequest, getSecret } from "./store.ts";
 
 type SecretToolDeps = {
-	db: Database;
+	db: SupabaseClient;
 	baseUrl: string;
 };
 
@@ -77,7 +77,7 @@ export function createSecretToolServer(deps: SecretToolDeps): McpSdkServerConfig
 					default: f.default,
 				}));
 
-				const { requestId, magicToken } = createSecretRequest(
+				const { requestId, magicToken } = await createSecretRequest(
 					deps.db,
 					fields,
 					input.purpose,
@@ -117,7 +117,7 @@ export function createSecretToolServer(deps: SecretToolDeps): McpSdkServerConfig
 		},
 		async ({ name }) => {
 			try {
-				const result = getSecret(deps.db, name);
+				const result = await getSecret(deps.db, name);
 				if (!result) {
 					return ok({
 						name,

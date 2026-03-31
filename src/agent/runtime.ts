@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import type { PhantomConfig } from "../config/types.ts";
@@ -30,7 +30,7 @@ export class AgentRuntime {
 	private lastTrackedFiles: string[] = [];
 	private mcpServerFactories: Record<string, () => McpServerConfig> | null = null;
 
-	constructor(config: PhantomConfig, db: Database) {
+	constructor(config: PhantomConfig, db: SupabaseClient) {
 		this.config = config;
 		this.sessionStore = new SessionStore(db);
 		this.costTracker = new CostTracker(db);
@@ -99,9 +99,9 @@ export class AgentRuntime {
 		startTime: number,
 		onEvent?: (event: RuntimeEvent) => void,
 	): Promise<AgentResponse> {
-		let session = this.sessionStore.findActive(channelId, conversationId);
+		let session = await this.sessionStore.findActive(channelId, conversationId);
 		const isResume = session?.sdk_session_id != null;
-		if (!session) session = this.sessionStore.create(channelId, conversationId);
+		if (!session) session = await this.sessionStore.create(channelId, conversationId);
 
 		const fileTracker = createFileTracker();
 		const commandBlocker = createDangerousCommandBlocker();
@@ -164,7 +164,7 @@ export class AgentRuntime {
 					case "system": {
 						if (message.subtype === "init") {
 							sdkSessionId = message.session_id;
-							this.sessionStore.updateSdkSessionId(sessionKey, sdkSessionId);
+							await this.sessionStore.updateSdkSessionId(sessionKey, sdkSessionId);
 							onEvent?.({ type: "init", sessionId: sdkSessionId });
 						}
 						break;
@@ -213,7 +213,7 @@ export class AgentRuntime {
 					// SDK session file is gone (container restart, deploy, etc).
 					// Clear the stale reference and retry as a fresh session.
 					console.log(`[runtime] Stale session detected, retrying without resume: ${sessionKey}`);
-					this.sessionStore.clearSdkSessionId(sessionKey);
+					await this.sessionStore.clearSdkSessionId(sessionKey);
 					sdkSessionId = "";
 					resultText = "";
 					cost = emptyCost();
@@ -236,8 +236,8 @@ export class AgentRuntime {
 		}
 
 		this.lastTrackedFiles = fileTracker.getTrackedFiles();
-		this.costTracker.record(sessionKey, cost, this.config.model);
-		this.sessionStore.touch(sessionKey);
+		await this.costTracker.record(sessionKey, cost, this.config.model);
+		await this.sessionStore.touch(sessionKey);
 
 		return {
 			text: resultText,

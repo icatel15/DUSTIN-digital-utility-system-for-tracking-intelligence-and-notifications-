@@ -218,7 +218,7 @@ function buildEnvironment(config: PhantomConfig): string {
 		lines.push("- Your data (config, memory, web pages, repos) persists in Docker volumes.");
 		lines.push("- To connect to services you create, use their container name as the hostname.");
 		lines.push("- Do NOT modify docker-compose.yaml or Dockerfile. Those are managed by the operator.");
-		lines.push("- Qdrant is at http://qdrant:6333, Ollama is at http://ollama:11434.");
+		lines.push("- Qdrant and embeddings are managed services (Qdrant Cloud + OpenAI). No local ML containers.");
 	}
 
 	return lines.join("\n");

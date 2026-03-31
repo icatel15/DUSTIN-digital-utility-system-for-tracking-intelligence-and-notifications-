@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 import { relative, resolve } from "node:path";
 import { createSSEResponse } from "./events.ts";
 import { loginPageHtml } from "./login-page.ts";
@@ -11,12 +11,12 @@ const COOKIE_NAME = "phantom_session";
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
 
 let publicDir = resolve(process.cwd(), "public");
-let secretsDb: Database | null = null;
+let secretsDb: SupabaseClient | null = null;
 
 type SecretSavedCallback = (requestId: string, secretNames: string[]) => Promise<void>;
 let onSecretSaved: SecretSavedCallback | null = null;
 
-export function setSecretsDb(db: Database): void {
+export function setSecretsDb(db: SupabaseClient): void {
 	secretsDb = db;
 }
 
@@ -149,13 +149,13 @@ export async function handleUiRequest(req: Request): Promise<Response> {
 	return new Response("Not found", { status: 404 });
 }
 
-function handleSecretFormGet(_req: Request, url: URL, requestId: string): Response {
+async function handleSecretFormGet(_req: Request, url: URL, requestId: string): Promise<Response> {
 	if (!secretsDb) {
 		return Response.json({ error: "Secrets not configured" }, { status: 500 });
 	}
 
 	const magicToken = url.searchParams.get("magic");
-	const request = getSecretRequest(secretsDb, requestId);
+	const request = await getSecretRequest(secretsDb, requestId);
 
 	if (!request) {
 		return new Response(secretsExpiredHtml(), {
@@ -177,7 +177,7 @@ function handleSecretFormGet(_req: Request, url: URL, requestId: string): Respon
 	}
 
 	// Authenticate via magic token and set session cookie
-	if (magicToken && validateMagicToken(secretsDb, requestId, magicToken)) {
+	if (magicToken && (await validateMagicToken(secretsDb, requestId, magicToken))) {
 		const { sessionToken } = createSession();
 		return new Response(secretsFormHtml(request), {
 			headers: {
@@ -218,7 +218,7 @@ async function handleSecretSave(req: Request, requestId: string): Promise<Respon
 	}
 
 	try {
-		const { saved } = saveSecrets(secretsDb, requestId, body.secrets);
+		const { saved } = await saveSecrets(secretsDb, requestId, body.secrets);
 
 		// Fire notification callback (non-blocking)
 		if (onSecretSaved) {
@@ -263,7 +263,7 @@ async function handleLoginPost(req: Request): Promise<Response> {
 		return new Response(JSON.stringify({ ok: true }), {
 			headers: {
 				"Content-Type": "application/json",
-				"Set-Cookie": buildSetCookieHeader(body.token),
+				"Set-Cookie": buildSetCookieHeader(sessionToken),
 			},
 		});
 	}

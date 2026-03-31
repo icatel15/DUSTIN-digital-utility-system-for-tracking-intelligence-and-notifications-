@@ -1,36 +1,41 @@
-import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const DEFAULT_DB_PATH = "data/phantom.db";
+let client: SupabaseClient | null = null;
 
-let db: Database | null = null;
+export function getDatabase(): SupabaseClient {
+	if (client) return client;
 
-export function getDatabase(path?: string): Database {
-	if (db) return db;
+	const url = process.env.SUPABASE_URL;
+	const key = process.env.SUPABASE_SERVICE_KEY;
 
-	const dbPath = path ?? DEFAULT_DB_PATH;
-	const dir = dirname(dbPath);
-	if (!existsSync(dir)) {
-		mkdirSync(dir, { recursive: true });
+	if (!url || !key) {
+		throw new Error(
+			"SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables are required. " +
+				"Set them in .env or your environment.",
+		);
 	}
 
-	db = new Database(dbPath, { create: true });
-	db.run("PRAGMA journal_mode = WAL");
-	db.run("PRAGMA foreign_keys = ON");
-	return db;
+	client = createClient(url, key, {
+		auth: { autoRefreshToken: false, persistSession: false },
+	});
+
+	return client;
 }
 
 export function closeDatabase(): void {
-	if (db) {
-		db.close();
-		db = null;
-	}
+	client = null;
 }
 
-export function createTestDatabase(): Database {
-	const testDb = new Database(":memory:");
-	testDb.run("PRAGMA journal_mode = WAL");
-	testDb.run("PRAGMA foreign_keys = ON");
-	return testDb;
+/**
+ * Create a mock Supabase client for testing.
+ * Tests should mock individual table operations as needed.
+ */
+export function createTestDatabase(): SupabaseClient {
+	const url = process.env.SUPABASE_URL ?? "http://localhost:54321";
+	const key = process.env.SUPABASE_SERVICE_KEY ?? "test-service-key";
+	return createClient(url, key, {
+		auth: { autoRefreshToken: false, persistSession: false },
+	});
 }
+
+export type { SupabaseClient };

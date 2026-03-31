@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 import { type McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 import type { PhantomConfig } from "../config/types.ts";
@@ -7,7 +7,7 @@ import type { MemorySystem } from "../memory/system.ts";
 
 export type ResourceDependencies = {
 	config: PhantomConfig;
-	db: Database;
+	db: SupabaseClient;
 	startedAt: number;
 	memory: MemorySystem | null;
 	evolution: EvolutionEngine | null;
@@ -36,11 +36,11 @@ function registerHealthResource(server: McpServer, deps: ResourceDependencies): 
 		},
 		async (): Promise<ReadResourceResult> => {
 			const memoryHealth = deps.memory
-				? await deps.memory.healthCheck().catch(() => ({ qdrant: false, ollama: false }))
-				: { qdrant: false, ollama: false };
+				? await deps.memory.healthCheck().catch(() => ({ qdrant: false, embeddings: false }))
+				: { qdrant: false, embeddings: false };
 
 			const uptimeSeconds = Math.floor((Date.now() - deps.startedAt) / 1000);
-			const allHealthy = memoryHealth.qdrant && memoryHealth.ollama;
+			const allHealthy = memoryHealth.qdrant && memoryHealth.embeddings;
 
 			return {
 				contents: [
@@ -171,11 +171,14 @@ function registerTasksActiveResource(server: McpServer, deps: ResourceDependenci
 			mimeType: "application/json",
 		},
 		async (): Promise<ReadResourceResult> => {
-			const tasks = deps.db
-				.query("SELECT * FROM tasks WHERE status IN ('queued', 'active') ORDER BY created_at DESC LIMIT 50")
-				.all();
+			const { data: tasks } = await deps.db
+				.from("tasks")
+				.select("*")
+				.in("status", ["queued", "active"])
+				.order("created_at", { ascending: false })
+				.limit(50);
 
-			return { contents: [{ uri: "phantom://tasks/active", text: JSON.stringify({ tasks }, null, 2) }] };
+			return { contents: [{ uri: "phantom://tasks/active", text: JSON.stringify({ tasks: tasks ?? [] }, null, 2) }] };
 		},
 	);
 }
@@ -189,11 +192,14 @@ function registerTasksCompletedResource(server: McpServer, deps: ResourceDepende
 			mimeType: "application/json",
 		},
 		async (): Promise<ReadResourceResult> => {
-			const tasks = deps.db
-				.query("SELECT * FROM tasks WHERE status IN ('completed', 'failed') ORDER BY completed_at DESC LIMIT 50")
-				.all();
+			const { data: tasks } = await deps.db
+				.from("tasks")
+				.select("*")
+				.in("status", ["completed", "failed"])
+				.order("completed_at", { ascending: false })
+				.limit(50);
 
-			return { contents: [{ uri: "phantom://tasks/completed", text: JSON.stringify({ tasks }, null, 2) }] };
+			return { contents: [{ uri: "phantom://tasks/completed", text: JSON.stringify({ tasks: tasks ?? [] }, null, 2) }] };
 		},
 	);
 }
@@ -208,9 +214,13 @@ function registerMetricsSummaryResource(server: McpServer, deps: ResourceDepende
 		},
 		async (): Promise<ReadResourceResult> => {
 			const metrics = deps.evolution?.getMetrics();
-			const costToday = deps.db
-				.query("SELECT COALESCE(SUM(cost_usd), 0) as total FROM cost_events WHERE created_at >= date('now')")
-				.get() as { total: number } | null;
+
+			const { data: costData } = await deps.db
+				.from("cost_events")
+				.select("cost_usd")
+				.gte("created_at", new Date(new Date().toISOString().slice(0, 10)).toISOString());
+
+			const costToday = (costData ?? []).reduce((sum, row) => sum + (row.cost_usd ?? 0), 0);
 
 			return {
 				contents: [
@@ -220,7 +230,7 @@ function registerMetricsSummaryResource(server: McpServer, deps: ResourceDepende
 							{
 								sessions: metrics?.session_count ?? 0,
 								successRate: metrics?.success_rate_7d ?? 0,
-								costToday: costToday?.total ?? 0,
+								costToday,
 								evolutionGeneration: deps.evolution?.getCurrentVersion() ?? 0,
 								evolutionCount: metrics?.evolution_count ?? 0,
 							},
@@ -251,20 +261,34 @@ function registerMetricsCostResource(server: McpServer, deps: ResourceDependenci
 			mimeType: "application/json",
 		},
 		async (uri, { period }): Promise<ReadResourceResult> => {
-			const dateFilter =
-				period === "today" ? "date('now')" : period === "week" ? "date('now', '-7 days')" : "date('now', '-30 days')";
+			const now = new Date();
+			let dateFilter: string;
+			if (period === "today") {
+				dateFilter = now.toISOString().slice(0, 10);
+			} else if (period === "week") {
+				const d = new Date(now);
+				d.setDate(d.getDate() - 7);
+				dateFilter = d.toISOString();
+			} else {
+				// month
+				const d = new Date(now);
+				d.setDate(d.getDate() - 30);
+				dateFilter = d.toISOString();
+			}
 
-			const row = deps.db
-				.query(
-					`SELECT COALESCE(SUM(cost_usd), 0) as total, COUNT(*) as events FROM cost_events WHERE created_at >= ${dateFilter}`,
-				)
-				.get() as { total: number; events: number };
+			const { data: costData } = await deps.db
+				.from("cost_events")
+				.select("cost_usd")
+				.gte("created_at", dateFilter);
+
+			const rows = costData ?? [];
+			const total = rows.reduce((sum, row) => sum + (row.cost_usd ?? 0), 0);
 
 			return {
 				contents: [
 					{
 						uri: uri.href,
-						text: JSON.stringify({ period, totalCost: row.total, events: row.events }, null, 2),
+						text: JSON.stringify({ period, totalCost: total, events: rows.length }, null, 2),
 					},
 				],
 			};

@@ -40,48 +40,38 @@ async function checkDocker(): Promise<CheckResult> {
 }
 
 async function checkQdrant(): Promise<CheckResult> {
+	const url = process.env.QDRANT_URL ?? "http://localhost:6333";
+	const apiKey = process.env.QDRANT_API_KEY;
 	try {
-		const resp = await fetch("http://localhost:6333/healthz", { signal: AbortSignal.timeout(3000) });
+		const headers: Record<string, string> = {};
+		if (apiKey) headers["api-key"] = apiKey;
+		const resp = await fetch(`${url}/`, { headers, signal: AbortSignal.timeout(5000) });
 		if (resp.ok) {
-			return { name: "Qdrant", status: "ok", message: "Healthy (port 6333)" };
+			const isCloud = url.includes("cloud.qdrant.io");
+			return { name: "Qdrant", status: "ok", message: `Healthy${isCloud ? " (Cloud)" : ""} at ${url}` };
 		}
-		return { name: "Qdrant", status: "fail", message: `HTTP ${resp.status}`, fix: "docker compose up -d qdrant" };
+		return { name: "Qdrant", status: "fail", message: `HTTP ${resp.status} at ${url}`, fix: "Check QDRANT_URL and QDRANT_API_KEY" };
 	} catch {
 		return {
 			name: "Qdrant",
 			status: "fail",
-			message: "Not reachable at localhost:6333",
-			fix: "docker compose up -d qdrant",
+			message: `Not reachable at ${url}`,
+			fix: "Check QDRANT_URL and QDRANT_API_KEY environment variables",
 		};
 	}
 }
 
-async function checkOllama(): Promise<CheckResult> {
-	try {
-		const resp = await fetch("http://localhost:11434/api/tags", { signal: AbortSignal.timeout(3000) });
-		if (!resp.ok) {
-			return { name: "Ollama", status: "fail", message: `HTTP ${resp.status}`, fix: "docker compose up -d ollama" };
-		}
-		const data = (await resp.json()) as { models?: Array<{ name: string }> };
-		const models = data.models ?? [];
-		const hasEmbed = models.some((m) => m.name.includes("nomic-embed-text"));
-		if (!hasEmbed) {
-			return {
-				name: "Ollama",
-				status: "warn",
-				message: "Running but nomic-embed-text model not pulled",
-				fix: "docker exec phantom-ollama ollama pull nomic-embed-text",
-			};
-		}
-		return { name: "Ollama", status: "ok", message: `Healthy, ${models.length} model(s) loaded` };
-	} catch {
+async function checkEmbeddings(): Promise<CheckResult> {
+	const apiKey = process.env.OPENAI_API_KEY;
+	if (!apiKey) {
 		return {
-			name: "Ollama",
+			name: "Embeddings",
 			status: "fail",
-			message: "Not reachable at localhost:11434",
-			fix: "docker compose up -d ollama",
+			message: "OPENAI_API_KEY not set",
+			fix: "Set OPENAI_API_KEY environment variable",
 		};
 	}
+	return { name: "Embeddings", status: "ok", message: "OpenAI API key configured" };
 }
 
 async function checkConfig(): Promise<CheckResult> {
@@ -125,14 +115,27 @@ async function checkMcpConfig(): Promise<CheckResult> {
 }
 
 async function checkDatabase(): Promise<CheckResult> {
+	const url = process.env.SUPABASE_URL;
+	const key = process.env.SUPABASE_SERVICE_KEY;
+	if (!url || !key) {
+		return {
+			name: "Supabase",
+			status: "fail",
+			message: "SUPABASE_URL or SUPABASE_SERVICE_KEY not set",
+			fix: "Set SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables",
+		};
+	}
 	try {
 		const { getDatabase } = await import("../db/connection.ts");
 		const db = getDatabase();
-		const result = db.query("SELECT COUNT(*) as count FROM sessions").get() as { count: number } | null;
-		const count = result?.count ?? 0;
-		return { name: "SQLite", status: "ok", message: `data/phantom.db (${count} sessions)` };
-	} catch {
-		return { name: "SQLite", status: "ok", message: "No database yet (will be created on first run)" };
+		const { count, error } = await db.from("sessions").select("*", { count: "exact", head: true });
+		if (error) {
+			return { name: "Supabase", status: "fail", message: error.message, fix: "Check Supabase connection and run migrations" };
+		}
+		return { name: "Supabase", status: "ok", message: `Connected (${count ?? 0} sessions)` };
+	} catch (err: unknown) {
+		const msg = err instanceof Error ? err.message : String(err);
+		return { name: "Supabase", status: "fail", message: msg, fix: "Check SUPABASE_URL and SUPABASE_SERVICE_KEY" };
 	}
 }
 
@@ -189,7 +192,7 @@ export async function runDoctor(args: string[]): Promise<void> {
 		checkBun(),
 		checkDocker(),
 		checkQdrant(),
-		checkOllama(),
+		checkEmbeddings(),
 		checkConfig(),
 		checkMcpConfig(),
 		checkDatabase(),

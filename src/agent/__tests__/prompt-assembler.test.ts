@@ -46,8 +46,8 @@ describe("assemblePrompt Docker awareness", () => {
 		expect(prompt).toContain("sibling");
 		expect(prompt).toContain("ClickHouse, Postgres, Redis");
 		expect(prompt).toContain("Docker volumes");
-		expect(prompt).toContain("http://qdrant:6333");
-		expect(prompt).toContain("http://ollama:11434");
+		expect(prompt).toContain("managed services");
+		expect(prompt).toContain("Qdrant Cloud");
 	});
 
 	test("Docker mode warns agent not to modify compose/Dockerfile", () => {

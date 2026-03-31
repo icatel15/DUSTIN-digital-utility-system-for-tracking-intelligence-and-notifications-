@@ -1,11 +1,12 @@
-# Environment variables QDRANT_URL and OLLAMA_URL override these values.
-# In Docker, compose sets QDRANT_URL=http://qdrant:6333 and OLLAMA_URL=http://ollama:11434.
+# Environment variables QDRANT_URL, QDRANT_API_KEY, and OPENAI_API_KEY override these values.
 qdrant:
   url: "http://localhost:6333"
+  # api_key: set via QDRANT_API_KEY env var for Qdrant Cloud
 
-ollama:
-  url: "http://localhost:11434"
-  model: "nomic-embed-text"
+embeddings:
+  provider: "openai"
+  model: "text-embedding-3-small"
+  # api_key: set via OPENAI_API_KEY env var
 
 collections:
   episodes: "episodes"
@@ -13,7 +14,7 @@ collections:
   procedures: "procedures"
 
 embedding:
-  dimensions: 768
+  dimensions: 1536
   batch_size: 32
 
 context:

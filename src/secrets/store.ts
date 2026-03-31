@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { decryptSecret, encryptSecret } from "./crypto.ts";
 
@@ -58,65 +58,76 @@ function hashToken(token: string): string {
 	return createHash("sha256").update(token).digest("hex");
 }
 
-export function createSecretRequest(
-	db: Database,
+export async function createSecretRequest(
+	db: SupabaseClient,
 	fields: SecretField[],
 	purpose: string,
 	notifyChannel: string | null,
 	notifyChannelId: string | null,
 	notifyThread: string | null,
-): { requestId: string; magicToken: string } {
+): Promise<{ requestId: string; magicToken: string }> {
 	const requestId = `sec_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
 	const magicToken = randomBytes(24).toString("base64url");
 	const magicTokenHash = hashToken(magicToken);
 	const now = new Date();
 	const expiresAt = new Date(now.getTime() + MAGIC_TOKEN_TTL_MS);
 
-	db.run(
-		`INSERT INTO secret_requests (request_id, fields_json, purpose, notify_channel, notify_channel_id, notify_thread, magic_token_hash, status, created_at, expires_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-		[
-			requestId,
-			JSON.stringify(fields),
-			purpose,
-			notifyChannel,
-			notifyChannelId,
-			notifyThread,
-			magicTokenHash,
-			now.toISOString(),
-			expiresAt.toISOString(),
-		],
-	);
+	const { error } = await db.from("secret_requests").insert({
+		request_id: requestId,
+		fields_json: JSON.stringify(fields),
+		purpose,
+		notify_channel: notifyChannel,
+		notify_channel_id: notifyChannelId,
+		notify_thread: notifyThread,
+		magic_token_hash: magicTokenHash,
+		status: "pending",
+		created_at: now.toISOString(),
+		expires_at: expiresAt.toISOString(),
+	});
+
+	if (error) throw new Error(`Failed to create secret request: ${error.message}`);
 
 	return { requestId, magicToken };
 }
 
-export function getSecretRequest(db: Database, requestId: string): SecretRequest | null {
-	const row = db.query("SELECT * FROM secret_requests WHERE request_id = ?").get(requestId) as SecretRequestRow | null;
-	if (!row) return null;
-	return rowToRequest(row);
+export async function getSecretRequest(db: SupabaseClient, requestId: string): Promise<SecretRequest | null> {
+	const { data, error } = await db
+		.from("secret_requests")
+		.select("*")
+		.eq("request_id", requestId)
+		.single();
+
+	if (error || !data) return null;
+	return rowToRequest(data as SecretRequestRow);
 }
 
-export function validateMagicToken(db: Database, requestId: string, magicToken: string): boolean {
-	const row = db
-		.query("SELECT magic_token_hash, status, expires_at FROM secret_requests WHERE request_id = ?")
-		.get(requestId) as { magic_token_hash: string; status: string; expires_at: string } | null;
+export async function validateMagicToken(db: SupabaseClient, requestId: string, magicToken: string): Promise<boolean> {
+	const { data, error } = await db
+		.from("secret_requests")
+		.select("magic_token_hash, status, expires_at")
+		.eq("request_id", requestId)
+		.single();
 
-	if (!row) return false;
-	if (row.status !== "pending") return false;
-	if (new Date(row.expires_at) < new Date()) return false;
+	if (error || !data) return false;
+	if (data.status !== "pending") return false;
+	if (new Date(data.expires_at) < new Date()) return false;
 
-	return row.magic_token_hash === hashToken(magicToken);
+	return data.magic_token_hash === hashToken(magicToken);
 }
 
-export function saveSecrets(db: Database, requestId: string, secrets: Record<string, string>): { saved: string[] } {
-	const request = getSecretRequest(db, requestId);
+export async function saveSecrets(
+	db: SupabaseClient,
+	requestId: string,
+	secrets: Record<string, string>,
+): Promise<{ saved: string[] }> {
+	const request = await getSecretRequest(db, requestId);
 	if (!request) throw new Error("Request not found");
 	if (request.status !== "pending") throw new Error("Request already completed");
 	if (new Date(request.expiresAt) < new Date()) throw new Error("Request expired");
 
 	const saved: string[] = [];
 	const fieldMap = new Map(request.fields.map((f) => [f.name, f]));
+	const now = new Date().toISOString();
 
 	for (const [name, value] of Object.entries(secrets)) {
 		if (!value.trim()) continue;
@@ -125,20 +136,32 @@ export function saveSecrets(db: Database, requestId: string, secrets: Record<str
 		const fieldType = field?.type ?? "password";
 		const { encrypted, iv, authTag } = encryptSecret(value);
 
-		db.run(
-			`INSERT OR REPLACE INTO secrets (name, encrypted_value, iv, auth_tag, field_type, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
-			[name, encrypted, iv, authTag, fieldType],
+		const { error } = await db.from("secrets").upsert(
+			{
+				name,
+				encrypted_value: encrypted,
+				iv,
+				auth_tag: authTag,
+				field_type: fieldType,
+				created_at: now,
+				updated_at: now,
+			},
+			{ onConflict: "name" },
 		);
+
+		if (error) throw new Error(`Failed to save secret '${name}': ${error.message}`);
 
 		saved.push(name);
 		console.log(`[secrets] Stored secret: ${name}`);
 	}
 
 	// Mark request as completed
-	db.run("UPDATE secret_requests SET status = 'completed', completed_at = datetime('now') WHERE request_id = ?", [
-		requestId,
-	]);
+	const { error: updateError } = await db
+		.from("secret_requests")
+		.update({ status: "completed", completed_at: now })
+		.eq("request_id", requestId);
+
+	if (updateError) throw new Error(`Failed to mark request completed: ${updateError.message}`);
 
 	return { saved };
 }
@@ -159,14 +182,24 @@ function rowToRequest(row: SecretRequestRow): SecretRequest {
 	};
 }
 
-export function getSecret(db: Database, name: string): { value: string; storedAt: string } | null {
-	const row = db.query("SELECT * FROM secrets WHERE name = ?").get(name) as SecretRow | null;
-	if (!row) return null;
+export async function getSecret(db: SupabaseClient, name: string): Promise<{ value: string; storedAt: string } | null> {
+	const { data, error } = await db
+		.from("secrets")
+		.select("*")
+		.eq("name", name)
+		.single();
+
+	if (error || !data) return null;
+	const row = data as SecretRow;
 
 	// Update access audit
-	db.run("UPDATE secrets SET last_accessed_at = datetime('now'), access_count = access_count + 1 WHERE name = ?", [
-		name,
-	]);
+	await db
+		.from("secrets")
+		.update({
+			last_accessed_at: new Date().toISOString(),
+			access_count: (row.access_count ?? 0) + 1,
+		})
+		.eq("name", name);
 
 	const value = decryptSecret(row.encrypted_value, row.iv, row.auth_tag);
 	console.log(`[secrets] Retrieved secret: ${name}`);

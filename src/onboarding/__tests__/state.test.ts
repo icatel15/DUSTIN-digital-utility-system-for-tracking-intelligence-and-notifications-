@@ -1,66 +1,59 @@
-import { Database } from "bun:sqlite";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { runMigrations } from "../../db/migrate.ts";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { createMockSupabase } from "../../db/test-helpers.ts";
 import { getOnboardingStatus, markOnboardingComplete, markOnboardingStarted } from "../state.ts";
 
 describe("onboarding state", () => {
-	let db: Database;
+	let db: ReturnType<typeof createMockSupabase>;
 
 	beforeEach(() => {
-		db = new Database(":memory:");
-		db.run("PRAGMA journal_mode = WAL");
-		db.run("PRAGMA foreign_keys = ON");
-		runMigrations(db);
+		db = createMockSupabase();
 	});
 
-	afterEach(() => {
-		db.close();
-	});
-
-	test("getOnboardingStatus returns pending when no records exist", () => {
-		const status = getOnboardingStatus(db);
+	test("getOnboardingStatus returns pending when no records exist", async () => {
+		const status = await getOnboardingStatus(db as any);
 		expect(status.status).toBe("pending");
 		expect(status.started_at).toBeNull();
 		expect(status.completed_at).toBeNull();
 	});
 
-	test("markOnboardingStarted creates in_progress record", () => {
-		markOnboardingStarted(db);
-		const status = getOnboardingStatus(db);
+	test("markOnboardingStarted creates in_progress record", async () => {
+		await markOnboardingStarted(db as any);
+		const status = await getOnboardingStatus(db as any);
 		expect(status.status).toBe("in_progress");
 		expect(status.started_at).not.toBeNull();
 		expect(status.completed_at).toBeNull();
 	});
 
-	test("markOnboardingStarted is idempotent", () => {
-		markOnboardingStarted(db);
-		markOnboardingStarted(db);
+	test("markOnboardingStarted is idempotent", async () => {
+		await markOnboardingStarted(db as any);
+		await markOnboardingStarted(db as any);
 
-		const rows = db.query("SELECT * FROM onboarding_state").all();
-		expect(rows).toHaveLength(1);
+		// Verify only one record exists by checking the select returns a single in_progress row
+		const { data } = await (db as any).from("onboarding_state").select("*");
+		expect(data).toHaveLength(1);
 	});
 
-	test("markOnboardingComplete transitions in_progress to complete", () => {
-		markOnboardingStarted(db);
-		markOnboardingComplete(db);
-		const status = getOnboardingStatus(db);
+	test("markOnboardingComplete transitions in_progress to complete", async () => {
+		await markOnboardingStarted(db as any);
+		await markOnboardingComplete(db as any);
+		const status = await getOnboardingStatus(db as any);
 		expect(status.status).toBe("complete");
 		expect(status.completed_at).not.toBeNull();
 	});
 
-	test("markOnboardingComplete does nothing when not in_progress", () => {
-		markOnboardingComplete(db);
-		const status = getOnboardingStatus(db);
+	test("markOnboardingComplete does nothing when not in_progress", async () => {
+		await markOnboardingComplete(db as any);
+		const status = await getOnboardingStatus(db as any);
 		expect(status.status).toBe("pending");
 	});
 
-	test("full lifecycle: pending -> in_progress -> complete", () => {
-		expect(getOnboardingStatus(db).status).toBe("pending");
+	test("full lifecycle: pending -> in_progress -> complete", async () => {
+		expect((await getOnboardingStatus(db as any)).status).toBe("pending");
 
-		markOnboardingStarted(db);
-		expect(getOnboardingStatus(db).status).toBe("in_progress");
+		await markOnboardingStarted(db as any);
+		expect((await getOnboardingStatus(db as any)).status).toBe("in_progress");
 
-		markOnboardingComplete(db);
-		expect(getOnboardingStatus(db).status).toBe("complete");
+		await markOnboardingComplete(db as any);
+		expect((await getOnboardingStatus(db as any)).status).toBe("complete");
 	});
 });

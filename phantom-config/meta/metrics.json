@@ -1,13 +1,13 @@
 {
-  "session_count": 0,
-  "success_count": 0,
+  "session_count": 2,
+  "success_count": 2,
   "failure_count": 0,
   "correction_count": 0,
   "evolution_count": 0,
   "rollback_count": 0,
-  "last_session_at": null,
+  "last_session_at": "2026-03-31T11:35:43.637Z",
   "last_evolution_at": null,
-  "success_rate_7d": 0,
+  "success_rate_7d": 1,
   "correction_rate_7d": 0,
-  "sessions_since_consolidation": 0
+  "sessions_since_consolidation": 2
 }

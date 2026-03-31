@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "../db/connection.ts";
 import { randomUUID } from "node:crypto";
 import type { AgentRuntime } from "../agent/runtime.ts";
 import type { SlackChannel } from "../channels/slack.ts";
@@ -10,14 +10,14 @@ const MAX_CONSECUTIVE_ERRORS = 10;
 const STARTUP_STAGGER_MS = 5_000;
 
 type SchedulerDeps = {
-	db: Database;
+	db: SupabaseClient;
 	runtime: AgentRuntime;
 	slackChannel?: SlackChannel;
 	ownerUserId?: string;
 };
 
 export class Scheduler {
-	private db: Database;
+	private db: SupabaseClient;
 	private runtime: AgentRuntime;
 	private slackChannel: SlackChannel | undefined;
 	private ownerUserId: string | undefined;
@@ -43,7 +43,7 @@ export class Scheduler {
 		this.running = true;
 
 		await this.recoverMissedJobs();
-		this.armTimer();
+		await this.armTimer();
 		console.log("[scheduler] Started");
 	}
 
@@ -60,58 +60,80 @@ export class Scheduler {
 		return this.running;
 	}
 
-	createJob(input: JobCreateInput): ScheduledJob {
+	async createJob(input: JobCreateInput): Promise<ScheduledJob> {
 		const id = randomUUID();
 		const scheduleValue = serializeScheduleValue(input.schedule);
 		const nextRun = computeNextRunAt(input.schedule);
 		const delivery = input.delivery ?? { channel: "slack", target: "owner" };
 
-		this.db.run(
-			`INSERT INTO scheduled_jobs (id, name, description, schedule_kind, schedule_value, task, delivery_channel, delivery_target, next_run_at, delete_after_run, created_by)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			[
-				id,
-				input.name,
-				input.description ?? null,
-				input.schedule.kind,
-				scheduleValue,
-				input.task,
-				delivery.channel,
-				delivery.target,
-				nextRun?.toISOString() ?? null,
-				input.deleteAfterRun ? 1 : 0,
-				input.createdBy ?? "agent",
-			],
-		);
+		const now = new Date().toISOString();
+		await this.db.from("scheduled_jobs").insert({
+			id,
+			name: input.name,
+			description: input.description ?? null,
+			enabled: true,
+			schedule_kind: input.schedule.kind,
+			schedule_value: scheduleValue,
+			task: input.task,
+			delivery_channel: delivery.channel,
+			delivery_target: delivery.target,
+			status: "active",
+			next_run_at: nextRun?.toISOString() ?? null,
+			run_count: 0,
+			consecutive_errors: 0,
+			last_run_at: null,
+			last_run_status: null,
+			last_run_duration_ms: null,
+			last_run_error: null,
+			delete_after_run: input.deleteAfterRun ?? false,
+			created_by: input.createdBy ?? "agent",
+			created_at: now,
+			updated_at: now,
+		});
 
-		this.armTimer();
+		await this.armTimer();
 
-		const created = this.getJob(id);
+		const created = await this.getJob(id);
 		if (!created) throw new Error(`Failed to create job: ${id}`);
 		return created;
 	}
 
-	deleteJob(id: string): boolean {
-		const result = this.db.run("DELETE FROM scheduled_jobs WHERE id = ?", [id]);
-		if (result.changes > 0) {
-			this.armTimer();
+	async deleteJob(id: string): Promise<boolean> {
+		const { data } = await this.db
+			.from("scheduled_jobs")
+			.delete()
+			.eq("id", id)
+			.select("id");
+
+		if (data && data.length > 0) {
+			await this.armTimer();
 			return true;
 		}
 		return false;
 	}
 
-	listJobs(): ScheduledJob[] {
-		const rows = this.db.query("SELECT * FROM scheduled_jobs ORDER BY created_at DESC").all() as JobRow[];
+	async listJobs(): Promise<ScheduledJob[]> {
+		const { data } = await this.db
+			.from("scheduled_jobs")
+			.select("*")
+			.order("created_at", { ascending: false });
+
+		const rows = (data ?? []) as JobRow[];
 		return rows.map(rowToJob);
 	}
 
-	getJob(id: string): ScheduledJob | null {
-		const row = this.db.query("SELECT * FROM scheduled_jobs WHERE id = ?").get(id) as JobRow | null;
-		return row ? rowToJob(row) : null;
+	async getJob(id: string): Promise<ScheduledJob | null> {
+		const { data } = await this.db
+			.from("scheduled_jobs")
+			.select("*")
+			.eq("id", id)
+			.maybeSingle();
+
+		return data ? rowToJob(data as JobRow) : null;
 	}
 
 	async runJobNow(id: string): Promise<string> {
-		const job = this.getJob(id);
+		const job = await this.getJob(id);
 		if (!job) throw new Error(`Job not found: ${id}`);
 		if (!job.enabled) throw new Error(`Job is disabled: ${id}`);
 
@@ -119,7 +141,7 @@ export class Scheduler {
 		return result;
 	}
 
-	armTimer(): void {
+	async armTimer(): Promise<void> {
 		if (!this.running) return;
 
 		if (this.timer) {
@@ -127,15 +149,19 @@ export class Scheduler {
 			this.timer = null;
 		}
 
-		const row = this.db
-			.query(
-				"SELECT MIN(next_run_at) as next FROM scheduled_jobs WHERE enabled = 1 AND status = 'active' AND next_run_at IS NOT NULL",
-			)
-			.get() as { next: string | null } | null;
+		const { data: row } = await this.db
+			.from("scheduled_jobs")
+			.select("next_run_at")
+			.eq("enabled", true)
+			.eq("status", "active")
+			.not("next_run_at", "is", null)
+			.order("next_run_at")
+			.limit(1)
+			.maybeSingle();
 
-		if (!row?.next) return;
+		if (!row?.next_run_at) return;
 
-		const nextMs = new Date(row.next).getTime();
+		const nextMs = new Date(row.next_run_at).getTime();
 		const delay = Math.max(0, nextMs - Date.now());
 		const clamped = Math.min(delay, MAX_TIMER_MS);
 
@@ -147,7 +173,7 @@ export class Scheduler {
 
 		// Concurrency guard: only one execution at a time
 		if (this.executing) {
-			this.armTimer();
+			await this.armTimer();
 			return;
 		}
 
@@ -155,13 +181,15 @@ export class Scheduler {
 
 		try {
 			const now = new Date().toISOString();
-			const dueRows = this.db
-				.query(
-					"SELECT * FROM scheduled_jobs WHERE enabled = 1 AND status = 'active' AND next_run_at <= ? ORDER BY next_run_at ASC",
-				)
-				.all(now) as JobRow[];
+			const { data: dueRows } = await this.db
+				.from("scheduled_jobs")
+				.select("*")
+				.eq("enabled", true)
+				.eq("status", "active")
+				.lte("next_run_at", now)
+				.order("next_run_at");
 
-			for (const row of dueRows) {
+			for (const row of (dueRows ?? []) as JobRow[]) {
 				if (!this.running) break;
 				const job = rowToJob(row);
 				try {
@@ -173,7 +201,7 @@ export class Scheduler {
 			}
 		} finally {
 			this.executing = false;
-			this.armTimer();
+			await this.armTimer();
 		}
 	}
 
@@ -228,24 +256,24 @@ export class Scheduler {
 			}
 		}
 
-		this.db.run(
-			`UPDATE scheduled_jobs SET
-				last_run_at = ?,
-				last_run_status = ?,
-				last_run_duration_ms = ?,
-				last_run_error = ?,
-				next_run_at = ?,
-				run_count = run_count + 1,
-				consecutive_errors = ?,
-				status = ?,
-				updated_at = datetime('now')
-			WHERE id = ?`,
-			[new Date(startMs).toISOString(), runStatus, durationMs, errorMsg, nextRunAt, newConsecErrors, newStatus, job.id],
-		);
+		await this.db
+			.from("scheduled_jobs")
+			.update({
+				last_run_at: new Date(startMs).toISOString(),
+				last_run_status: runStatus,
+				last_run_duration_ms: durationMs,
+				last_run_error: errorMsg,
+				next_run_at: nextRunAt,
+				run_count: job.runCount + 1,
+				consecutive_errors: newConsecErrors,
+				status: newStatus,
+				updated_at: new Date().toISOString(),
+			})
+			.eq("id", job.id);
 
 		// Delete completed one-shot jobs
 		if (newStatus === "completed" && job.deleteAfterRun) {
-			this.db.run("DELETE FROM scheduled_jobs WHERE id = ?", [job.id]);
+			await this.db.from("scheduled_jobs").delete().eq("id", job.id);
 		}
 
 		// Deliver result
@@ -282,18 +310,20 @@ export class Scheduler {
 
 	private async recoverMissedJobs(): Promise<void> {
 		const now = new Date().toISOString();
-		const missedRows = this.db
-			.query(
-				"SELECT * FROM scheduled_jobs WHERE enabled = 1 AND status = 'active' AND next_run_at < ? ORDER BY next_run_at ASC",
-			)
-			.all(now) as JobRow[];
+		const { data: missedRows } = await this.db
+			.from("scheduled_jobs")
+			.select("*")
+			.eq("enabled", true)
+			.eq("status", "active")
+			.lt("next_run_at", now)
+			.order("next_run_at");
 
-		if (missedRows.length === 0) return;
+		if (!missedRows || missedRows.length === 0) return;
 
 		console.log(`[scheduler] Recovering ${missedRows.length} missed job(s)`);
 
 		for (let i = 0; i < missedRows.length; i++) {
-			const job = rowToJob(missedRows[i]);
+			const job = rowToJob(missedRows[i] as JobRow);
 
 			// Stagger missed job execution to avoid overload
 			if (i > 0) {
@@ -316,7 +346,7 @@ function rowToJob(row: JobRow): ScheduledJob {
 		id: row.id,
 		name: row.name,
 		description: row.description,
-		enabled: row.enabled === 1,
+		enabled: row.enabled,
 		schedule,
 		task: row.task,
 		delivery: {
@@ -331,7 +361,7 @@ function rowToJob(row: JobRow): ScheduledJob {
 		nextRunAt: row.next_run_at,
 		runCount: row.run_count,
 		consecutiveErrors: row.consecutive_errors,
-		deleteAfterRun: row.delete_after_run === 1,
+		deleteAfterRun: row.delete_after_run,
 		createdAt: row.created_at,
 		createdBy: row.created_by,
 		updatedAt: row.updated_at,

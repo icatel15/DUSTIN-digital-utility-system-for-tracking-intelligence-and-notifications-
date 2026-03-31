@@ -72,12 +72,15 @@ export const MemoryConfigSchema = z.object({
 	qdrant: z
 		.object({
 			url: z.string().url().default("http://localhost:6333"),
+			api_key: z.string().optional(),
 		})
 		.default({}),
-	ollama: z
+	embeddings: z
 		.object({
-			url: z.string().url().default("http://localhost:11434"),
-			model: z.string().min(1).default("nomic-embed-text"),
+			provider: z.enum(["openai", "ollama"]).default("openai"),
+			api_key: z.string().optional(),
+			model: z.string().min(1).default("text-embedding-3-small"),
+			url: z.string().url().optional(),
 		})
 		.default({}),
 	collections: z
@@ -89,7 +92,7 @@ export const MemoryConfigSchema = z.object({
 		.default({}),
 	embedding: z
 		.object({
-			dimensions: z.number().int().positive().default(768),
+			dimensions: z.number().int().positive().default(1536),
 			batch_size: z.number().int().positive().default(32),
 		})
 		.default({}),
