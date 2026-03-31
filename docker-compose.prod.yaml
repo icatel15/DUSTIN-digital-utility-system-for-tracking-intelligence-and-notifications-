@@ -4,5 +4,5 @@
 
 services:
   dustin:
-    ports:
+    ports: !override
       - "127.0.0.1:${PORT:-3100}:3100"
