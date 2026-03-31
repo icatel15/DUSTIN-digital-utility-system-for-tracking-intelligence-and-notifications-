@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import { createInProcessToolServer } from "./agent/in-process-tools.ts";
 import { AgentRuntime } from "./agent/runtime.ts";
 import type { RuntimeEvent } from "./agent/runtime.ts";
+import { ConversationLogger } from "./audit/conversation-logger.ts";
 import { CliChannel } from "./channels/cli.ts";
 import { EmailChannel } from "./channels/email.ts";
 import { emitFeedback, setFeedbackHandler } from "./channels/feedback.ts";
@@ -33,7 +34,6 @@ import { runMigrations } from "./db/migrate.ts";
 import { createEmailToolServer } from "./email/tool.ts";
 import { EvolutionEngine } from "./evolution/engine.ts";
 import type { SessionSummary } from "./evolution/types.ts";
-import { ConversationLogger } from "./audit/conversation-logger.ts";
 import { AuditLogger } from "./mcp/audit.ts";
 import { PeerHealthMonitor } from "./mcp/peer-health.ts";
 import { PeerManager } from "./mcp/peers.ts";
@@ -158,6 +158,8 @@ async function main(): Promise<void> {
 		}
 	});
 
+	const channelsConfig = loadChannelsConfig();
+
 	let mcpServer: PhantomMcpServer | null = null;
 	let scheduler: Scheduler | null = null;
 	try {
@@ -244,7 +246,6 @@ async function main(): Promise<void> {
 
 	// Register Slack channel
 	let slackChannel: SlackChannel | null = null;
-	const channelsConfig = loadChannelsConfig();
 	if (channelsConfig?.slack?.enabled && channelsConfig.slack.bot_token && channelsConfig.slack.app_token) {
 		slackChannel = new SlackChannel({
 			botToken: channelsConfig.slack.bot_token,

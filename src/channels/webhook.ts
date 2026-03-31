@@ -97,7 +97,7 @@ export class WebhookChannel implements Channel {
 		const taskIds = this.conversationTasks.get(conversationId);
 		if (taskIds && taskIds.size > 0) {
 			// Take the first (oldest) task for this conversation
-			const taskId = taskIds.values().next().value!;
+			const taskId = taskIds.values().next().value as string;
 			taskIds.delete(taskId);
 			if (taskIds.size === 0) this.conversationTasks.delete(conversationId);
 
@@ -165,14 +165,19 @@ export class WebhookChannel implements Channel {
 		let timestampStr = req.headers.get("X-Webhook-Timestamp");
 
 		if (!signature && payload.signature) {
-			console.warn("[webhook] DEPRECATED: body-based auth — migrate to X-Webhook-Signature and X-Webhook-Timestamp headers");
+			console.warn(
+				"[webhook] DEPRECATED: body-based auth — migrate to X-Webhook-Signature and X-Webhook-Timestamp headers",
+			);
 			signature = payload.signature;
 			timestampStr = payload.timestamp != null ? String(payload.timestamp) : null;
 		}
 
 		if (!signature || !timestampStr) {
 			return Response.json(
-				{ status: "error", message: "Missing authentication: X-Webhook-Signature and X-Webhook-Timestamp headers required" },
+				{
+					status: "error",
+					message: "Missing authentication: X-Webhook-Signature and X-Webhook-Timestamp headers required",
+				},
 				{ status: 401 },
 			);
 		}
