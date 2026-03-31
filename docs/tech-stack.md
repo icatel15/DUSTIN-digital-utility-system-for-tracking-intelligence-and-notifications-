@@ -14,7 +14,7 @@ Layer-to-technology mapping for DUSTIN. The project is forked from Phantom v0.18
 | Channels | Slack Bolt, Telegraf, ImapFlow, Nodemailer | Multi-channel messaging |
 | Config | YAML + Zod validation | `${VAR}` env substitution |
 | MCP | @modelcontextprotocol/sdk (Streamable HTTP) | External client connectivity |
-| Process mgmt | systemd | Service supervision |
+| Process mgmt | Docker (was systemd) | Container lifecycle management |
 
 ## Target (DUSTIN)
 
@@ -28,9 +28,11 @@ Layer-to-technology mapping for DUSTIN. The project is forked from Phantom v0.18
 | Channels | Telegraf (primary), Resend (email), Webhook | Drops Slack, uses Resend instead of SMTP |
 | Config | YAML + Zod validation | No change from baseline |
 | MCP | @modelcontextprotocol/sdk (Streamable HTTP) | No change from baseline |
-| Hosting | Hetzner CX22/CX32 VPS, Ubuntu 24.04, Caddy | Reverse proxy via Caddy |
+| Hosting | Hetzner CX22/CX32 VPS, Ubuntu 24.04, Docker | Containerized deployment |
+| CI/CD | GitHub Actions + GHCR | Auto-deploy on merge to main |
+| Container Registry | ghcr.io/icatel15/dustin | Private GHCR image |
 | Notion | @notionhq/client (bidirectional sync) | New integration, not in Phantom |
 
 ## Migration Path
 
-Phase 1 replaces the data layer: Qdrant local to Qdrant Cloud, Ollama to OpenAI embeddings, SQLite to Supabase. Channels and Notion integration follow in later phases.
+Phase 1 replaced the data layer: Qdrant local → Qdrant Cloud, Ollama → OpenAI embeddings, SQLite → Supabase. Phase 2 added Telegram. Phase 6 replaced manual scp + systemd deployment with Docker + CI/CD auto-deploy via GHCR.

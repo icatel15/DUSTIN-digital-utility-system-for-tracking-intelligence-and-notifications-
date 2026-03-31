@@ -10,6 +10,6 @@ No open decisions at this time.
 
 ## Resolved
 
-**OD-06** (resolved 2026-03-31): Docker Hub image name → `ghostwright/dustin`. Part of broader DUSTIN rebrand.
+**OD-06** (resolved 2026-03-31): Container registry → GHCR (`ghcr.io/icatel15/dustin`). No Docker Hub account needed; built-in GITHUB_TOKEN handles workflow auth.
 
 **OD-07** (resolved 2026-03-31): Deploy user → `dustin`. Docker handles runtime isolation; dedicated deploy user adds complexity without meaningful security gain.

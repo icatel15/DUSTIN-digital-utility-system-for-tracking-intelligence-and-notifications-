@@ -8,7 +8,7 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 
 ## Current Phase
 
-**Phase 6 — CI/CD Pipeline & Deployment Hardening** (in progress)
+**Phase 6 — CI/CD Pipeline & Deployment Hardening** (complete)
 
 ## Current State
 
@@ -17,8 +17,8 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 - All managed services connected: Qdrant Cloud, OpenAI embeddings, Supabase
 - Self-evolution running (generation 5, LLM judges enabled)
 - 804 tests passing
-- Deploy is manual (scp + systemctl restart) — migrating to Docker + CI/CD
-- CI/CD spec documented (`docs/ci-cd.md`)
+- CI/CD pipeline live: merge to main → auto-deploy via Docker + GHCR
+- Running via Docker on VPS (migrated from systemd 2026-03-31)
 
 ## Active Phase File
 
@@ -34,12 +34,10 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 | 3 | Notion Integration | [ ] Not started |
 | 4 | Email Channel (Resend) | [ ] Not started |
 | 5 | Web Dashboard | [ ] Not started |
-| 6 | CI/CD Pipeline & Deployment Hardening | [-] In progress |
+| 6 | CI/CD Pipeline & Deployment Hardening | [x] Complete |
 
 ## Outstanding Work
 
-- [-] CI/CD pipeline (Phase 6 — spec done, implementation next)
-- [ ] VPS migration: systemd → Docker
 - [ ] Add Tash's Telegram user ID for partner access
 - [ ] Custom domain + Caddy HTTPS
 - [ ] Notion integration (Phase 3)
@@ -50,11 +48,10 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 
 ## Next Steps
 
-1. Implement CI/CD workflows (Phase 6)
-2. Migrate VPS from systemd to Docker
-3. Rotate exposed API keys
-4. Add Tash's Telegram ID for partner access
+1. Rotate exposed API keys
+2. Add Tash's Telegram ID for partner access
+3. Phase 3: Notion integration (bidirectional sync)
 
 ## Open Decisions
 
-See `docs/status/open-decisions.md` — all resolved (OD-06: `ghostwright/dustin`, OD-07: `dustin` user).
+See `docs/status/open-decisions.md` — no open decisions.

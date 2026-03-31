@@ -131,12 +131,14 @@ LLM judges (Sonnet) available for gates when API key is set. Falls back to heuri
 |-----------|------------|
 | Runtime | Bun (TypeScript, no compilation) |
 | Agent | @anthropic-ai/claude-agent-sdk (Opus 4.6) |
-| Vector DB | Qdrant (Docker) |
-| Embeddings | Ollama (nomic-embed-text) |
-| State DB | SQLite (Bun built-in) |
-| Channels | Slack Bolt, Telegraf, ImapFlow, Nodemailer |
+| Vector DB | Qdrant Cloud (managed) |
+| Embeddings | OpenAI text-embedding-3-small (1536d) |
+| State DB | Supabase (managed Postgres) |
+| Channels | Telegraf (primary), ImapFlow, Nodemailer |
 | Config | YAML + Zod validation |
-| Process | systemd (on Specter VMs) |
+| Deploy | Docker container on Hetzner VPS |
+| CI/CD | GitHub Actions → GHCR → SSH deploy |
+| Registry | ghcr.io/icatel15/dustin |
 
 ## File Structure
 

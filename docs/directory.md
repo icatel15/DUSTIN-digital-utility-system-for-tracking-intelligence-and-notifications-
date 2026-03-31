@@ -26,8 +26,10 @@ Structure map for DUSTIN. Based on Phantom v0.18.1 layout.
 ├── phantom-config/       — Evolved config (grows over time via self-evolution)
 ├── docs/                 — Documentation (architecture, specs, this directory)
 ├── public/               — Publicly served files (dashboards, pages, tools)
-├── scripts/              — Docker entrypoint, deploy scripts
-├── docker-compose.yaml   — Container orchestration (Qdrant, Ollama)
+├── scripts/              — Docker entrypoint, deploy scripts, VPS migration
+├── .github/workflows/    — CI/CD pipelines (ci.yml, deploy.yml, release.yml)
+├── docker-compose.yaml   — Local dev container orchestration (builds from source)
+├── docker-compose.user.yaml — Production compose (pulls from GHCR)
 ├── biome.json            — Linter/formatter configuration
 ├── tsconfig.json         — TypeScript configuration (strict mode)
 ├── package.json          — Dependencies and scripts

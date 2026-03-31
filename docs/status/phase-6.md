@@ -1,7 +1,8 @@
 # Phase 6 — CI/CD Pipeline & Deployment Hardening
 
-**Status**: In Progress
+**Status**: Complete
 **Started**: 2026-03-31
+**Completed**: 2026-03-31
 
 ## Deliverables
 
@@ -14,9 +15,12 @@
 - [x] Deploy SSH key setup (GitHub secret `VPS_SSH_KEY` + VPS authorized_keys)
 - [x] Add `VPS_HOST` GitHub secret
 - [x] Migration script (`scripts/migrate-to-docker.sh`)
-- [ ] Create GitHub PAT with `read:packages` scope for VPS GHCR pull
-- [ ] VPS migration: install Docker, stop systemd service, first `docker compose up`
-- [ ] Verify end-to-end: merge → deploy → Telegram responds
+- [x] VPS GHCR authentication (both root and dustin users)
+- [x] VPS migration: Docker installed, systemd stopped, container running
+- [x] Health check verified: status ok, Telegram connected, Qdrant connected, generation 5
+- [x] Fix pre-existing lint errors (140 biome violations, noExplicitAny in tests)
+- [x] Fix pre-existing type errors (missing awaits, unused vars, null handling)
+- [x] Fix flaky crypto test (auth tag tamper test across Bun versions)
 
 ## Decisions
 
@@ -50,6 +54,8 @@
 **V-6.01**: Spec initially described Docker Hub as the registry. Switched to GHCR after discovering no Docker Hub account existed — simpler setup with zero external accounts.
 
 **V-6.02**: Spec described three separate workflows (CI, Deploy, Release). Deploy and Release reuse CI as a called workflow via `workflow_call` rather than duplicating test steps.
+
+**V-6.03**: 140 pre-existing lint errors and several type errors had to be fixed before CI could pass. These were never caught because the old CI only ran on PRs, not on pushes to main.
 
 ## Open Decisions
 
