@@ -79,9 +79,9 @@ jobs:
             PREVIOUS_DIGEST=$(docker inspect dustin --format '{{.Image}}' 2>/dev/null || echo "none")
             echo "Previous digest: $PREVIOUS_DIGEST"
 
-            # Pull new image and restart (with production port binding)
+            # Pull new image and restart
             docker compose pull dustin
-            docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d dustin
+            docker compose up -d dustin
 
             # Health check: poll /health every 5s for up to 120s
             # (matches Dockerfile HEALTHCHECK --start-period=120s)
