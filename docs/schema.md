@@ -71,6 +71,43 @@ Registry of dynamically created tools.
 | created_at | timestamptz | default now() |
 | updated_at | timestamptz | default now() |
 
+### conversation_messages
+
+Append-only audit trail of every message processed by the Phantom agent. Stores user messages, assistant responses, and tool_use events as individual rows. Includes a `tsvector` generated column for full-text search via direct SQL.
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | serial | PK |
+| conversation_id | text | NOT NULL |
+| session_id | text | nullable (null on user messages) |
+| channel_id | text | NOT NULL |
+| sender_id | text | NOT NULL |
+| role | text | CHECK ('user', 'assistant', 'tool_use'), NOT NULL |
+| content | text | NOT NULL (truncated to 4000 chars) |
+| tool_name | text | nullable (populated for tool_use rows) |
+| tool_input | jsonb | nullable (populated for tool_use rows) |
+| created_at | timestamptz | default now() |
+| tsv | tsvector | GENERATED ALWAYS (auto-maintained FTS index) |
+
+**Indexes:** conversation_id, channel_id, created_at DESC, role, session_id (partial, WHERE NOT NULL), GIN on tsv.
+
+**MCP tool:** `phantom_conversation_history` (read scope) — queries this table with filters.
+
+**Direct SQL examples:**
+```sql
+-- Recent messages across all conversations
+SELECT role, left(content, 100) as preview, created_at
+FROM conversation_messages ORDER BY created_at DESC LIMIT 50;
+
+-- Full conversation replay
+SELECT role, sender_id, content, tool_name, created_at
+FROM conversation_messages WHERE conversation_id = 'telegram:12345' ORDER BY id;
+
+-- Full-text search
+SELECT role, content, created_at FROM conversation_messages
+WHERE tsv @@ plainto_tsquery('english', 'deployment error') ORDER BY created_at DESC;
+```
+
 ### evolution_observations
 
 Raw observations extracted from sessions by the evolution engine.

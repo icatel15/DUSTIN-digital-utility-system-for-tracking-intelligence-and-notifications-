@@ -16,7 +16,7 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 - Telegram two-user mode active (Woody = owner, Tash = partner pending ID)
 - All managed services connected: Qdrant Cloud, OpenAI embeddings, Supabase
 - Self-evolution running (generation 5, LLM judges enabled)
-- 943 tests passing
+- 965 tests passing
 - CI/CD pipeline live: merge to main → auto-deploy via Docker + GHCR
 - Running via Docker on VPS (migrated from systemd 2026-03-31)
 - Security hardening complete: 5 findings remediated (commit `d5ce1be`, 2026-03-31)

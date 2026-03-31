@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import YAML from "yaml";
 import { hashTokenSync, loadMcpConfig } from "../config.ts";
@@ -28,6 +28,29 @@ describe("MCP Config", () => {
 		expect(config.tokens[1].scopes).toEqual(["read"]);
 		expect(config.rate_limit.requests_per_minute).toBe(60);
 		expect(existsSync(freshPath)).toBe(true);
+
+		// Token file should also be created alongside config
+		const tokenFilePath = freshPath.replace(/\.yaml$/, "-tokens");
+		expect(existsSync(tokenFilePath)).toBe(true);
+		const tokenContent = readFileSync(tokenFilePath, "utf-8");
+		expect(tokenContent).toContain("admin=");
+		expect(tokenContent).toContain("read-only=");
+	});
+
+	test("generateDefaultConfig does NOT print raw tokens to stdout", () => {
+		const logSpy = spyOn(console, "log").mockImplementation(() => {});
+		try {
+			const freshPath = join(tmpDir, "no-leak-mcp.yaml");
+			loadMcpConfig(freshPath);
+
+			const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+			for (const call of logSpy.mock.calls) {
+				const line = call.map(String).join(" ");
+				expect(line).not.toMatch(uuidPattern);
+			}
+		} finally {
+			logSpy.mockRestore();
+		}
 	});
 
 	test("loads existing config", () => {

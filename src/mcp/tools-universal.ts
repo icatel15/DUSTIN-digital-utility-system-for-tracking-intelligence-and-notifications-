@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { AgentRuntime } from "../agent/runtime.ts";
+import { ConversationLogger } from "../audit/conversation-logger.ts";
 import type { PhantomConfig } from "../config/types.ts";
 import type { SupabaseClient } from "../db/connection.ts";
 import type { EvolutionEngine } from "../evolution/engine.ts";
@@ -25,6 +26,7 @@ export function registerUniversalTools(server: McpServer, deps: ToolDependencies
 	registerPhantomAsk(server, deps);
 	registerPhantomTaskCreate(server, deps);
 	registerPhantomTaskStatus(server, deps);
+	registerPhantomConversationHistory(server, deps);
 }
 
 function registerPhantomStatus(server: McpServer, deps: ToolDependencies): void {
@@ -350,6 +352,38 @@ function registerPhantomTaskStatus(server: McpServer, deps: ToolDependencies): v
 			}
 
 			return { content: [{ type: "text", text: JSON.stringify(task, null, 2) }] };
+		},
+	);
+}
+
+function registerPhantomConversationHistory(server: McpServer, deps: ToolDependencies): void {
+	const logger = new ConversationLogger(deps.db);
+
+	server.registerTool(
+		"phantom_conversation_history",
+		{
+			description:
+				"Search the conversation audit trail. Returns individual messages (user, assistant, tool_use) filtered by conversation, channel, session, role, or date range.",
+			inputSchema: z.object({
+				conversation_id: z
+					.string()
+					.optional()
+					.describe("Filter by conversation key (format: channelId:conversationId)"),
+				channel_id: z.string().optional().describe("Filter by channel (slack, telegram, cli, webhook, etc.)"),
+				session_id: z.string().optional().describe("Filter by SDK session ID"),
+				role: z.enum(["user", "assistant", "tool_use"]).optional().describe("Filter by message role"),
+				since: z.string().optional().describe("ISO 8601 start timestamp (inclusive)"),
+				until: z.string().optional().describe("ISO 8601 end timestamp (inclusive)"),
+				limit: z.number().int().min(1).max(200).optional().default(50).describe("Maximum rows to return"),
+			}),
+		},
+		async ({ conversation_id, channel_id, session_id, role, since, until, limit }): Promise<CallToolResult> => {
+			const rows = await logger
+				.query({ conversation_id, channel_id, session_id, role, since, until, limit })
+				.catch(() => []);
+			return {
+				content: [{ type: "text", text: JSON.stringify({ messages: rows, count: rows.length }, null, 2) }],
+			};
 		},
 	);
 }

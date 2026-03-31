@@ -18,7 +18,7 @@ function makeConfig(port: number) {
 		name: "test-phantom",
 		port,
 		role: "swe",
-		model: "claude-sonnet-4-6",
+		model: "claude-haiku-4-5",
 		effort: "max" as const,
 		max_budget_usd: 0,
 		timeout_minutes: 240,
@@ -274,7 +274,105 @@ describe("POST /trigger authentication", () => {
 	});
 
 	// -----------------------------------------------------------------------
-	// 8. Audit entry stores metadata only, NOT raw task text
+	// 8. Delivery target not in allowlist -> 403
+	// -----------------------------------------------------------------------
+	test("returns 403 when delivery target is not in allowlist", async () => {
+		process.env.TRIGGER_SECRET = TEST_SECRET;
+
+		const runtime = makeMockRuntime();
+		const { audit, entries } = makeMockAudit();
+		setTriggerDeps({
+			runtime,
+			audit,
+			deliveryAllowlist: new Set(["C04ALLOWED"]),
+		});
+
+		server = startServer(makeConfig(port), Date.now());
+
+		const res = await triggerRequest(
+			port,
+			{ task: "hello", delivery: { target: "C04FORBIDDEN" } },
+			TEST_SECRET,
+		);
+
+		expect(res.status).toBe(403);
+		const json = (await res.json()) as { status: string; message: string };
+		expect(json.message).toBe("Delivery target not in allowlist");
+
+		// Should audit the rejection
+		expect(entries).toHaveLength(1);
+		expect(entries[0].status).toBe("error");
+		expect(entries[0].input_summary).toContain("REJECTED");
+	});
+
+	// -----------------------------------------------------------------------
+	// 9. Delivery target in allowlist -> 200
+	// -----------------------------------------------------------------------
+	test("returns 200 when delivery target is in allowlist", async () => {
+		process.env.TRIGGER_SECRET = TEST_SECRET;
+
+		const runtime = makeMockRuntime();
+		setTriggerDeps({
+			runtime,
+			deliveryAllowlist: new Set(["C04ALLOWED"]),
+		});
+
+		server = startServer(makeConfig(port), Date.now());
+
+		const res = await triggerRequest(
+			port,
+			{ task: "hello", delivery: { target: "C04ALLOWED" } },
+			TEST_SECRET,
+		);
+
+		expect(res.status).toBe(200);
+	});
+
+	// -----------------------------------------------------------------------
+	// 10. Owner target always allowed regardless of allowlist
+	// -----------------------------------------------------------------------
+	test("allows owner target regardless of allowlist", async () => {
+		process.env.TRIGGER_SECRET = TEST_SECRET;
+
+		const runtime = makeMockRuntime();
+		setTriggerDeps({
+			runtime,
+			deliveryAllowlist: new Set(["C04ALLOWED"]),
+		});
+
+		server = startServer(makeConfig(port), Date.now());
+
+		const res = await triggerRequest(
+			port,
+			{ task: "hello", delivery: { target: "owner" } },
+			TEST_SECRET,
+		);
+
+		expect(res.status).toBe(200);
+	});
+
+	// -----------------------------------------------------------------------
+	// 11. No allowlist means all targets allowed (backward compatible)
+	// -----------------------------------------------------------------------
+	test("allows any target when no allowlist is configured", async () => {
+		process.env.TRIGGER_SECRET = TEST_SECRET;
+
+		const runtime = makeMockRuntime();
+		setTriggerDeps({ runtime });
+
+		server = startServer(makeConfig(port), Date.now());
+
+		const res = await triggerRequest(
+			port,
+			{ task: "hello", delivery: { target: "C04ANYTHING" } },
+			TEST_SECRET,
+		);
+
+		expect(res.status).toBe(200);
+	});
+
+	// -----------------------------------------------------------------------
+	// 12. Audit entry stores metadata only, NOT raw task text
 	// -----------------------------------------------------------------------
 	test("audit entry stores metadata only and does NOT contain raw task text", async () => {
 		process.env.TRIGGER_SECRET = TEST_SECRET;

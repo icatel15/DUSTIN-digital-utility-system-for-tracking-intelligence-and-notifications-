@@ -161,18 +161,18 @@ export function loginPageHtml(): string {
       <div class="card-body p-8">
         <h1 class="text-lg font-semibold tracking-tight mb-1">Welcome back</h1>
         <p class="text-sm text-base-content/50 mb-6 leading-relaxed">
-          Enter the access token from your Slack DM to continue.
+          Use the magic link from your Slack DM, or paste the token below.
         </p>
 
         <form id="login-form" autocomplete="off">
           <div class="mb-5">
-            <label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="token">Access token</label>
+            <label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="token">Magic link token</label>
             <input
               class="input input-bordered w-full bg-base-100 border-base-300 focus:border-primary focus:outline-none text-sm"
               id="token"
               name="token"
               type="text"
-              placeholder="Paste your token here"
+              placeholder="Paste your magic link token here"
               autocomplete="off"
               spellcheck="false"
             />

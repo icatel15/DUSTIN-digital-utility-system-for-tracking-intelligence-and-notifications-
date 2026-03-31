@@ -12,7 +12,7 @@ export const PhantomConfigSchema = z.object({
 	domain: z.string().optional(),
 	port: z.number().int().min(1).max(65535).default(3100),
 	role: z.string().min(1).default("swe"),
-	model: z.string().min(1).default("claude-sonnet-4-6"),
+	model: z.string().min(1).default("claude-haiku-4-5"),
 	effort: z.enum(["low", "medium", "high", "max"]).default("max"),
 	max_budget_usd: z.number().min(0).default(0),
 	timeout_minutes: z.number().min(1).default(240),
@@ -26,6 +26,9 @@ export const SlackChannelConfigSchema = z.object({
 	default_channel_id: z.string().optional(),
 	default_user_id: z.string().optional(),
 	owner_user_id: z.string().optional(),
+	delivery_allowlist: z
+		.array(z.string().regex(/^[CU][A-Z0-9]+$/))
+		.optional(),
 });
 
 export const TelegramChannelConfigSchema = z.object({

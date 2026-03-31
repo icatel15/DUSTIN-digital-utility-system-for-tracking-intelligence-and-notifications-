@@ -71,7 +71,7 @@ describe("phantom init", () => {
 		Object.assign(process.env, saved);
 		expect(config.role).toBe("swe");
 		expect(config.port).toBe(3100);
-		expect(config.model).toBe("claude-sonnet-4-6");
+		expect(config.model).toBe("claude-haiku-4-5");
 	});
 
 	test("accepts custom name and role", async () => {
@@ -96,13 +96,39 @@ describe("phantom init", () => {
 		expect(config.tokens[0].scopes).toContain("admin");
 	});
 
-	test("prints MCP tokens", async () => {
+	test("does NOT print raw MCP tokens in --yes mode", async () => {
 		const { runInit } = await import("../init.ts");
 		await runInit(["--yes"]);
 
-		expect(logs.some((l) => l.includes("Admin:"))).toBe(true);
-		expect(logs.some((l) => l.includes("Operator:"))).toBe(true);
-		expect(logs.some((l) => l.includes("Read:"))).toBe(true);
+		// UUID pattern: 8-4-4-4-12 hex
+		const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+		for (const line of logs) {
+			expect(line).not.toMatch(uuidPattern);
+		}
+		// Should point to the token file instead
+		expect(logs.some((l) => l.includes("config/.mcp-tokens"))).toBe(true);
+	});
+
+	test("writes MCP token file with correct content in --yes mode", async () => {
+		const { runInit } = await import("../init.ts");
+		await runInit(["--yes"]);
+
+		expect(existsSync("config/.mcp-tokens")).toBe(true);
+
+		const tokenFile = readFileSync("config/.mcp-tokens", "utf-8");
+		const lines = tokenFile.trim().split("\n");
+		expect(lines).toHaveLength(3);
+		expect(lines[0]).toMatch(/^admin=[0-9a-f]{8}-/);
+		expect(lines[1]).toMatch(/^operator=[0-9a-f]{8}-/);
+		expect(lines[2]).toMatch(/^read=[0-9a-f]{8}-/);
+
+		// Verify tokens match hashes in mcp.yaml
+		const { hashTokenSync } = await import("../../mcp/config.ts");
+		const mcpRaw = readFileSync("config/mcp.yaml", "utf-8");
+		const mcpConfig = YAML.parse(mcpRaw);
+
+		const adminToken = lines[0].split("=")[1];
+		expect(mcpConfig.tokens[0].hash).toBe(hashTokenSync(adminToken));
 	});
 
 	test("refuses to reinitialize if config exists", async () => {
@@ -316,13 +342,13 @@ describe("phantom init --yes (environment-aware)", () => {
 		expect(config.model).toBe("claude-opus-4-6");
 	});
 
-	test("defaults model to claude-sonnet-4-6", async () => {
+	test("defaults model to claude-haiku-4-5", async () => {
 		const { runInit } = await import("../init.ts");
 		await runInit(["--yes"]);
 
 		const raw = readFileSync("config/phantom.yaml", "utf-8");
 		const config = YAML.parse(raw);
-		expect(config.model).toBe("claude-sonnet-4-6");
+		expect(config.model).toBe("claude-haiku-4-5");
 	});
 
 	test("reads PHANTOM_DOMAIN from environment", async () => {

@@ -21,8 +21,10 @@ export type WebhookPayload = {
 	thread_id?: string;
 	metadata?: Record<string, unknown>;
 	callback_url?: string;
-	timestamp: number;
-	signature: string;
+	/** @deprecated Use X-Webhook-Timestamp header instead. */
+	timestamp?: number;
+	/** @deprecated Use X-Webhook-Signature header instead. */
+	signature?: string;
 };
 
 export type WebhookResponse = {
@@ -40,6 +42,13 @@ export type WebhookResponse = {
 type PendingResponse = {
 	resolve: (text: string) => void;
 	timer: ReturnType<typeof setTimeout>;
+	taskId: string;
+	conversationId: string;
+};
+
+type CallbackEntry = {
+	url: string;
+	conversationId: string;
 };
 
 export class WebhookChannel implements Channel {
@@ -57,8 +66,10 @@ export class WebhookChannel implements Channel {
 	private connected = false;
 	// Track pending sync responses: taskId -> resolver
 	private pendingResponses = new Map<string, PendingResponse>();
-	// Track async callback URLs: conversationId -> callbackUrl
-	private callbackUrls = new Map<string, string>();
+	// Track async callback URLs: taskId -> { url, conversationId }
+	private callbackUrls = new Map<string, CallbackEntry>();
+	// Reverse index: conversationId -> Set<taskId> (for routing responses from send())
+	private conversationTasks = new Map<string, Set<string>>();
 
 	constructor(config: WebhookChannelConfig) {
 		this.config = config;
@@ -77,24 +88,33 @@ export class WebhookChannel implements Channel {
 		}
 		this.pendingResponses.clear();
 		this.callbackUrls.clear();
+		this.conversationTasks.clear();
 		this.connected = false;
 		console.log("[webhook] Disconnected");
 	}
 
 	async send(conversationId: string, message: OutboundMessage): Promise<SentMessage> {
-		// Check if there's a pending sync response for this conversation
-		const pending = this.pendingResponses.get(conversationId);
-		if (pending) {
-			clearTimeout(pending.timer);
-			pending.resolve(message.text);
-			this.pendingResponses.delete(conversationId);
-		}
+		const taskIds = this.conversationTasks.get(conversationId);
+		if (taskIds && taskIds.size > 0) {
+			// Take the first (oldest) task for this conversation
+			const taskId = taskIds.values().next().value!;
+			taskIds.delete(taskId);
+			if (taskIds.size === 0) this.conversationTasks.delete(conversationId);
 
-		// Check if there's an async callback URL
-		const callbackUrl = this.callbackUrls.get(conversationId);
-		if (callbackUrl) {
-			await this.sendCallback(callbackUrl, conversationId, message.text);
-			this.callbackUrls.delete(conversationId);
+			// Resolve sync pending response
+			const pending = this.pendingResponses.get(taskId);
+			if (pending) {
+				clearTimeout(pending.timer);
+				pending.resolve(message.text);
+				this.pendingResponses.delete(taskId);
+			}
+
+			// Send async callback
+			const callback = this.callbackUrls.get(taskId);
+			if (callback) {
+				await this.sendCallback(callback.url, callback.conversationId, message.text);
+				this.callbackUrls.delete(taskId);
+			}
 		}
 
 		return {
@@ -132,22 +152,44 @@ export class WebhookChannel implements Channel {
 			return Response.json({ status: "error", message: "Invalid JSON" }, { status: 400 });
 		}
 
-		// Validate required fields
-		if (!payload.message || !payload.conversation_id || !payload.timestamp || !payload.signature) {
+		// Validate required payload fields
+		if (!payload.message || !payload.conversation_id) {
 			return Response.json(
-				{ status: "error", message: "Missing required fields: message, conversation_id, timestamp, signature" },
+				{ status: "error", message: "Missing required fields: message, conversation_id" },
 				{ status: 400 },
 			);
 		}
 
+		// Read auth from headers (preferred) or fall back to body fields (deprecated)
+		let signature = req.headers.get("X-Webhook-Signature");
+		let timestampStr = req.headers.get("X-Webhook-Timestamp");
+
+		if (!signature && payload.signature) {
+			console.warn("[webhook] DEPRECATED: body-based auth — migrate to X-Webhook-Signature and X-Webhook-Timestamp headers");
+			signature = payload.signature;
+			timestampStr = payload.timestamp != null ? String(payload.timestamp) : null;
+		}
+
+		if (!signature || !timestampStr) {
+			return Response.json(
+				{ status: "error", message: "Missing authentication: X-Webhook-Signature and X-Webhook-Timestamp headers required" },
+				{ status: 401 },
+			);
+		}
+
+		const timestamp = Number(timestampStr);
+		if (Number.isNaN(timestamp)) {
+			return Response.json({ status: "error", message: "Invalid timestamp" }, { status: 400 });
+		}
+
 		// Verify signature
-		if (!this.verifySignature(body, String(payload.timestamp), payload.signature)) {
+		if (!this.verifySignature(body, timestampStr, signature)) {
 			return Response.json({ status: "error", message: "Invalid signature" }, { status: 401 });
 		}
 
 		// Verify timestamp freshness (5 minute window)
 		const now = Date.now();
-		const age = Math.abs(now - payload.timestamp);
+		const age = Math.abs(now - timestamp);
 		if (age > 5 * 60 * 1000) {
 			return Response.json({ status: "error", message: "Timestamp too old" }, { status: 401 });
 		}
@@ -157,28 +199,37 @@ export class WebhookChannel implements Channel {
 		}
 
 		const conversationId = `webhook:${payload.conversation_id}`;
+		const taskId = randomUUID();
 
 		const inbound: InboundMessage = {
-			id: randomUUID(),
+			id: taskId,
 			channelId: this.id,
 			conversationId,
 			senderId: payload.user_id ?? "webhook",
 			text: payload.message,
-			timestamp: new Date(payload.timestamp),
+			timestamp: new Date(timestamp),
 			metadata: payload.metadata,
 		};
+
+		// Register in the reverse index
+		const tasks = this.conversationTasks.get(conversationId) ?? new Set<string>();
+		tasks.add(taskId);
+		this.conversationTasks.set(conversationId, tasks);
 
 		// Async mode: return immediately, send response to callback URL
 		if (payload.callback_url) {
 			const validation = await isSafeCallbackUrlAsync(payload.callback_url);
 			if (!validation.safe) {
+				// Clean up reverse index on early exit
+				tasks.delete(taskId);
+				if (tasks.size === 0) this.conversationTasks.delete(conversationId);
 				return Response.json(
 					{ status: "error", message: `Invalid callback URL: ${validation.reason}` },
 					{ status: 400 },
 				);
 			}
-			const taskId = randomUUID();
-			this.callbackUrls.set(conversationId, payload.callback_url);
+
+			this.callbackUrls.set(taskId, { url: payload.callback_url, conversationId });
 
 			// Fire and forget
 			void this.messageHandler(inbound).catch((err: unknown) => {
@@ -191,7 +242,7 @@ export class WebhookChannel implements Channel {
 
 		// Sync mode: wait for the response
 		const timeoutMs = this.config.syncTimeoutMs ?? 25_000;
-		const responseText = await this.waitForResponse(conversationId, inbound, timeoutMs);
+		const responseText = await this.waitForResponse(conversationId, taskId, inbound, timeoutMs);
 
 		if (responseText === null) {
 			return Response.json({ status: "error", message: "Response timeout" } satisfies WebhookResponse, { status: 504 });
@@ -205,24 +256,37 @@ export class WebhookChannel implements Channel {
 
 	private async waitForResponse(
 		conversationId: string,
+		taskId: string,
 		inbound: InboundMessage,
 		timeoutMs: number,
 	): Promise<string | null> {
 		return new Promise<string | null>((resolve) => {
 			const timer = setTimeout(() => {
-				this.pendingResponses.delete(conversationId);
+				this.pendingResponses.delete(taskId);
+				const tasks = this.conversationTasks.get(conversationId);
+				if (tasks) {
+					tasks.delete(taskId);
+					if (tasks.size === 0) this.conversationTasks.delete(conversationId);
+				}
 				resolve(null);
 			}, timeoutMs);
 
-			this.pendingResponses.set(conversationId, {
+			this.pendingResponses.set(taskId, {
 				resolve: (text: string) => resolve(text),
 				timer,
+				taskId,
+				conversationId,
 			});
 
 			// Process the message (will call send() which resolves the promise)
 			void this.messageHandler?.(inbound).catch((err: unknown) => {
 				clearTimeout(timer);
-				this.pendingResponses.delete(conversationId);
+				this.pendingResponses.delete(taskId);
+				const tasks = this.conversationTasks.get(conversationId);
+				if (tasks) {
+					tasks.delete(taskId);
+					if (tasks.size === 0) this.conversationTasks.delete(conversationId);
+				}
 				const msg = err instanceof Error ? err.message : String(err);
 				console.error(`[webhook] Error handling sync message: ${msg}`);
 				resolve(null);

@@ -24,6 +24,7 @@ export type TriggerDeps = {
 	ownerUserId?: string;
 	audit?: AuditLogger;
 	rateLimiter?: RateLimiter;
+	deliveryAllowlist?: Set<string>;
 };
 
 let memoryHealthProvider: MemoryHealthProvider | null = null;
@@ -239,6 +240,24 @@ async function handleTrigger(req: Request): Promise<Response> {
 	const conversationId = `trigger:${Date.now()}`;
 	const source = body.source ?? "http";
 	const deliveryTarget = body.delivery?.target ?? "owner";
+
+	// Enforce delivery target allowlist (owner is always permitted)
+	if (deliveryTarget !== "owner" && triggerDeps.deliveryAllowlist && !triggerDeps.deliveryAllowlist.has(deliveryTarget)) {
+		if (triggerDeps.audit) {
+			await triggerDeps.audit.log({
+				client_name: "trigger",
+				method: "POST /trigger",
+				tool_name: null,
+				resource_uri: null,
+				input_summary: `target=${deliveryTarget} REJECTED (not in allowlist)`,
+				output_summary: "Delivery target not allowed",
+				cost_usd: 0,
+				duration_ms: 0,
+				status: "error",
+			});
+		}
+		return Response.json({ status: "error", message: "Delivery target not in allowlist" }, { status: 403 });
+	}
 
 	try {
 		const response = await triggerDeps.runtime.handleMessage("trigger", conversationId, body.task);

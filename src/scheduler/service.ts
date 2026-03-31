@@ -14,6 +14,7 @@ type SchedulerDeps = {
 	runtime: AgentRuntime;
 	slackChannel?: SlackChannel;
 	ownerUserId?: string;
+	deliveryAllowlist?: Set<string>;
 };
 
 export class Scheduler {
@@ -21,6 +22,7 @@ export class Scheduler {
 	private runtime: AgentRuntime;
 	private slackChannel: SlackChannel | undefined;
 	private ownerUserId: string | undefined;
+	private deliveryAllowlist: Set<string> | undefined;
 	private timer: ReturnType<typeof setTimeout> | null = null;
 	private running = false;
 	private executing = false;
@@ -30,6 +32,7 @@ export class Scheduler {
 		this.runtime = deps.runtime;
 		this.slackChannel = deps.slackChannel;
 		this.ownerUserId = deps.ownerUserId;
+		this.deliveryAllowlist = deps.deliveryAllowlist;
 	}
 
 	/** Set Slack channel after construction (for lazy wiring when channels init after scheduler) */
@@ -65,6 +68,11 @@ export class Scheduler {
 		const scheduleValue = serializeScheduleValue(input.schedule);
 		const nextRun = computeNextRunAt(input.schedule);
 		const delivery = input.delivery ?? { channel: "slack", target: "owner" };
+
+		// Validate delivery target against allowlist at creation time
+		if (delivery.target !== "owner" && this.deliveryAllowlist && !this.deliveryAllowlist.has(delivery.target)) {
+			throw new Error(`Delivery target '${delivery.target}' is not in the allowed delivery targets`);
+		}
 
 		const now = new Date().toISOString();
 		await this.db.from("scheduled_jobs").insert({
@@ -278,6 +286,13 @@ export class Scheduler {
 
 		if (job.delivery.channel === "slack" && this.slackChannel) {
 			const target = job.delivery.target;
+
+			// Enforce delivery target allowlist (owner is always permitted)
+			if (target !== "owner" && this.deliveryAllowlist && !this.deliveryAllowlist.has(target)) {
+				console.warn(`[scheduler] Delivery target ${target} not in allowlist, skipping delivery for job ${job.id}`);
+				return;
+			}
+
 			if (target === "owner" && this.ownerUserId) {
 				await this.slackChannel.sendDm(this.ownerUserId, text);
 			} else if (target.startsWith("C")) {

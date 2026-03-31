@@ -31,7 +31,7 @@ describe("login page", () => {
 		const body = await res.text();
 		expect(body).toContain("Phantom");
 		expect(body).toContain("login-form");
-		expect(body).toContain("Access token");
+		expect(body).toContain("Magic link token");
 	});
 });
 
@@ -64,7 +64,7 @@ describe("login POST", () => {
 		expect(res.status).toBe(401);
 	});
 
-	test("POST /ui/login with direct session token works", async () => {
+	test("POST /ui/login with direct session token is rejected", async () => {
 		const { sessionToken } = createSession();
 		const res = await handleUiRequest(
 			req("/ui/login", {
@@ -73,9 +73,7 @@ describe("login POST", () => {
 				body: JSON.stringify({ token: sessionToken }),
 			}),
 		);
-		expect(res.status).toBe(200);
-		const cookie = res.headers.get("Set-Cookie");
-		expect(cookie).toContain("phantom_session=");
+		expect(res.status).toBe(401);
 	});
 
 	test("POST /ui/login with missing token returns 400", async () => {

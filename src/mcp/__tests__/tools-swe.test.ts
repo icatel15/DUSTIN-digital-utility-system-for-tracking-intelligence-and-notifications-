@@ -161,7 +161,7 @@ describe("SWE MCP Tools", () => {
 		const result = body.result as { tools: Array<{ name: string }> };
 		const toolNames = result.tools.map((t) => t.name);
 
-		// Universal tools (8)
+		// Universal tools (9)
 		expect(toolNames).toContain("phantom_status");
 		expect(toolNames).toContain("phantom_ask");
 		expect(toolNames).toContain("phantom_memory_query");
@@ -170,6 +170,7 @@ describe("SWE MCP Tools", () => {
 		expect(toolNames).toContain("phantom_history");
 		expect(toolNames).toContain("phantom_task_create");
 		expect(toolNames).toContain("phantom_task_status");
+		expect(toolNames).toContain("phantom_conversation_history");
 
 		// SWE-specific tools (6)
 		expect(toolNames).toContain("phantom_codebase_query");
@@ -180,14 +181,14 @@ describe("SWE MCP Tools", () => {
 		expect(toolNames).toContain("phantom_repo_info");
 	});
 
-	test("total tool count is 17 (8 universal + 6 SWE + 3 dynamic management)", async () => {
+	test("total tool count is 18 (9 universal + 6 SWE + 3 dynamic management)", async () => {
 		const sessionId = await initSession(mcpServer, adminToken);
 		const res = await mcpServer.handleRequest(
 			mcpRequest(adminToken, { jsonrpc: "2.0", id: 11, method: "tools/list" }, sessionId),
 		);
 		const body = (await res.json()) as Record<string, unknown>;
 		const result = body.result as { tools: Array<{ name: string }> };
-		expect(result.tools).toHaveLength(17);
+		expect(result.tools).toHaveLength(18);
 	});
 
 	test("phantom_codebase_query returns domain knowledge", async () => {

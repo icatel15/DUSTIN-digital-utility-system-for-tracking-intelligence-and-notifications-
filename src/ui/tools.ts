@@ -91,7 +91,6 @@ export function createWebUiToolServer(domain: string | undefined, agentName: str
 
 				return ok({
 					magicLink: loginUrl,
-					sessionToken,
 					expiresIn: "10 minutes",
 					sessionDuration: "7 days",
 					note: "Send the magic link to the user via Slack. They click it and are authenticated instantly.",

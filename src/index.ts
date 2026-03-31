@@ -33,6 +33,7 @@ import { runMigrations } from "./db/migrate.ts";
 import { createEmailToolServer } from "./email/tool.ts";
 import { EvolutionEngine } from "./evolution/engine.ts";
 import type { SessionSummary } from "./evolution/types.ts";
+import { ConversationLogger } from "./audit/conversation-logger.ts";
 import { AuditLogger } from "./mcp/audit.ts";
 import { PeerHealthMonitor } from "./mcp/peer-health.ts";
 import { PeerManager } from "./mcp/peers.ts";
@@ -175,7 +176,10 @@ async function main(): Promise<void> {
 		const registry = mcpServer.getDynamicToolRegistry();
 
 		// Wire scheduler into the agent (Slack channel set later after channel init)
-		scheduler = new Scheduler({ db, runtime });
+		const schedulerAllowlist = channelsConfig?.slack?.delivery_allowlist
+			? new Set(channelsConfig.slack.delivery_allowlist)
+			: undefined;
+		scheduler = new Scheduler({ db, runtime, deliveryAllowlist: schedulerAllowlist });
 
 		// Pass factories (not singletons) so each query() gets fresh MCP server instances.
 		// The underlying registries (DynamicToolRegistry, Scheduler) are singletons.
@@ -356,6 +360,7 @@ async function main(): Promise<void> {
 	setOnboardingStatusProvider(async () => (await getOnboardingStatus(db)).status);
 
 	const conversationMessages = new Map<string, { user: string[]; assistant: string[] }>();
+	const conversationLogger = new ConversationLogger(db);
 
 	router.onMessage(async (msg) => {
 		const sessionStartedAt = new Date().toISOString();
@@ -364,6 +369,16 @@ async function main(): Promise<void> {
 		const existing = conversationMessages.get(convKey) ?? { user: [], assistant: [] };
 		existing.user.push(msg.text);
 		conversationMessages.set(convKey, existing);
+
+		// Audit: log user message (fire-and-forget)
+		conversationLogger.log({
+			conversation_id: convKey,
+			session_id: null,
+			channel_id: msg.channelId,
+			sender_id: msg.senderId,
+			role: "user",
+			content: msg.text,
+		});
 
 		const isSlack = msg.channelId === "slack" && slackChannel && msg.metadata;
 		const isTelegram = msg.channelId === "telegram" && telegramChannel && msg.metadata;
@@ -418,9 +433,12 @@ async function main(): Promise<void> {
 			telegramChannel.startTyping(telegramChatId);
 		}
 
+		let currentSessionId: string | null = null;
+
 		const response = await runtime.handleMessage(msg.channelId, msg.conversationId, msg.text, (event: RuntimeEvent) => {
 			switch (event.type) {
 				case "init":
+					currentSessionId = event.sessionId;
 					console.log(`\n[phantom] Session: ${event.sessionId}`);
 					break;
 				case "thinking":
@@ -432,6 +450,17 @@ async function main(): Promise<void> {
 						const summary = formatToolActivity(event.tool, event.input);
 						progressStream.addToolActivity(event.tool, summary);
 					}
+					// Audit: log tool use (fire-and-forget)
+					conversationLogger.log({
+						conversation_id: convKey,
+						session_id: currentSessionId,
+						channel_id: msg.channelId,
+						sender_id: "phantom",
+						role: "tool_use",
+						content: event.tool,
+						tool_name: event.tool,
+						tool_input: event.input ?? null,
+					});
 					break;
 				case "error":
 					statusReactions?.setError();
@@ -442,6 +471,16 @@ async function main(): Promise<void> {
 		// Track assistant messages
 		if (response.text) {
 			existing.assistant.push(response.text);
+
+			// Audit: log assistant response (fire-and-forget)
+			conversationLogger.log({
+				conversation_id: convKey,
+				session_id: response.sessionId,
+				channel_id: msg.channelId,
+				sender_id: "phantom",
+				role: "assistant",
+				content: response.text,
+			});
 		}
 
 		// Finalize: set done reaction
@@ -612,12 +651,16 @@ async function main(): Promise<void> {
 	// Wire /trigger endpoint with auth, rate limiting, and audit logging
 	const triggerAudit = new AuditLogger(db);
 	const triggerRateLimiter = new RateLimiter({ requests_per_minute: 30, burst: 5 });
+	const deliveryAllowlist = channelsConfig?.slack?.delivery_allowlist
+		? new Set(channelsConfig.slack.delivery_allowlist)
+		: undefined;
 	setTriggerDeps({
 		runtime,
 		slackChannel: slackChannel ?? undefined,
 		ownerUserId: channelsConfig?.slack?.owner_user_id,
 		audit: triggerAudit,
 		rateLimiter: triggerRateLimiter,
+		deliveryAllowlist,
 	});
 
 	// Wire secret save notification: when the user saves credentials via the form,

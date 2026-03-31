@@ -44,6 +44,10 @@ fi
 if [ ! -f /app/config/phantom.yaml ]; then
   echo "[dustin] First run detected. Initializing configuration..."
   bun run src/cli/main.ts init --yes
+  # Ensure token file has restrictive permissions
+  if [ -f /app/config/.mcp-tokens ]; then
+    chmod 600 /app/config/.mcp-tokens
+  fi
   echo "[dustin] Configuration initialized"
 else
   echo "[dustin] Configuration exists, skipping init"

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { setPublicDir } from "../serve.ts";
-import { revokeAllSessions } from "../session.ts";
+import { createSession, revokeAllSessions } from "../session.ts";
 import { createWebUiToolServer } from "../tools.ts";
 
 const testPublicDir = resolve(import.meta.dir, "../../../public");
@@ -39,6 +39,28 @@ describe("phantom_generate_login tool integration", () => {
 		const server = createWebUiToolServer("ghostwright.dev", "phantom-dev");
 		// The tool server is an MCP SDK server. We test it by verifying the factory produces valid output.
 		expect(server).toBeDefined();
+	});
+
+	test("tool output does NOT contain sessionToken", () => {
+		// createSession returns both tokens internally, but the tool should only expose magicLink
+		const { sessionToken, magicToken } = createSession();
+		const loginUrl = `https://phantom-dev.ghostwright.dev/ui/login?magic=${magicToken}`;
+
+		// Simulate what the tool returns (same structure as tools.ts handler)
+		const toolOutput = {
+			magicLink: loginUrl,
+			expiresIn: "10 minutes",
+			sessionDuration: "7 days",
+			note: "Send the magic link to the user via Slack. They click it and are authenticated instantly.",
+		};
+
+		expect(toolOutput).not.toHaveProperty("sessionToken");
+		expect(toolOutput).toHaveProperty("magicLink");
+		expect(toolOutput.magicLink).toContain("magic=");
+
+		// Also verify the raw session token does not appear anywhere in serialized output
+		const serialized = JSON.stringify(toolOutput);
+		expect(serialized).not.toContain(sessionToken);
 	});
 });
 

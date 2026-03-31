@@ -175,22 +175,30 @@ webhook:
 
 ### Usage
 
+Authentication uses HMAC-SHA256 signatures passed via HTTP headers. The signature is computed over `{timestamp}.{body}` where `body` is the raw JSON request body.
+
 ```bash
+# Compute signature: HMAC-SHA256(secret, "{timestamp}.{body}")
+TIMESTAMP=$(date +%s%3N)
+BODY='{"message": "What is the status of the deploy?", "conversation_id": "conv-123", "user_id": "ci-bot"}'
+SIGNATURE=$(echo -n "${TIMESTAMP}.${BODY}" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" | cut -d' ' -f2)
+
 # Synchronous (wait for response)
 curl -X POST https://your-phantom/webhook \
   -H "Content-Type: application/json" \
-  -H "X-Webhook-Signature: sha256=..." \
-  -H "X-Webhook-Timestamp: 1711375200" \
-  -d '{"text": "What is the status of the deploy?", "sender_id": "ci-bot"}'
+  -H "X-Webhook-Signature: ${SIGNATURE}" \
+  -H "X-Webhook-Timestamp: ${TIMESTAMP}" \
+  -d "${BODY}"
 
-# Asynchronous (immediate 202, callback later)
+# Asynchronous (immediate 202 with task_id, callback later)
 curl -X POST https://your-phantom/webhook \
   -H "Content-Type: application/json" \
-  -H "X-Webhook-Signature: sha256=..." \
-  -d '{"text": "Run the test suite", "sender_id": "ci-bot", "callback_url": "https://my-server/callback"}'
+  -H "X-Webhook-Signature: ${SIGNATURE}" \
+  -H "X-Webhook-Timestamp: ${TIMESTAMP}" \
+  -d '{"message": "Run the test suite", "conversation_id": "conv-456", "user_id": "ci-bot", "callback_url": "https://my-server/callback"}'
 ```
 
-HMAC-SHA256 signature verification with timing-safe comparison. 5-minute timestamp freshness window.
+HMAC-SHA256 signature verification with timing-safe comparison. 5-minute timestamp freshness window. Each request gets a unique server-generated `task_id` for response routing — concurrent requests with the same `conversation_id` are handled independently.
 
 ## CLI
 

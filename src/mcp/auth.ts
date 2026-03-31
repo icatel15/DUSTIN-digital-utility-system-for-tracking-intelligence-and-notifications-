@@ -54,7 +54,7 @@ export class AuthMiddleware {
 	}
 }
 
-// Scope requirements for each tool/method — all 17 built-in tools
+// Scope requirements for each tool/method — all 18 built-in tools
 const TOOL_SCOPES: Record<string, McpScope> = {
 	phantom_ask: "operator",
 	phantom_status: "read",
@@ -64,6 +64,7 @@ const TOOL_SCOPES: Record<string, McpScope> = {
 	phantom_config: "read",
 	phantom_history: "read",
 	phantom_metrics: "read",
+	phantom_conversation_history: "read",
 	phantom_register_tool: "admin",
 	phantom_unregister_tool: "admin",
 	phantom_list_dynamic_tools: "read",

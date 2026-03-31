@@ -273,15 +273,5 @@ async function handleLoginPost(req: Request): Promise<Response> {
 		});
 	}
 
-	// Try as direct session token
-	if (isValidSession(body.token)) {
-		return new Response(JSON.stringify({ ok: true }), {
-			headers: {
-				"Content-Type": "application/json",
-				"Set-Cookie": buildSetCookieHeader(body.token),
-			},
-		});
-	}
-
 	return Response.json({ error: "Invalid or expired token" }, { status: 401 });
 }

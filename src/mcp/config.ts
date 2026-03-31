@@ -66,11 +66,15 @@ function generateDefaultConfig(path: string): McpConfig {
 	}
 
 	const yamlContent = YAML.stringify(config);
-	writeFileSync(path, yamlContent, "utf-8");
+	writeFileSync(path, yamlContent, { encoding: "utf-8", mode: 0o600 });
+
+	// Write plaintext tokens to a restricted file — never to stdout
+	const tokenFilePath = path.replace(/\.yaml$/, "-tokens");
+	const tokenContent = `admin=${adminToken}\nread-only=${readToken}\n`;
+	writeFileSync(tokenFilePath, tokenContent, { mode: 0o600 });
 
 	console.log("[mcp] Generated default MCP config at", path);
-	console.log("[mcp] Admin token (save this, it won't be shown again):", adminToken);
-	console.log("[mcp] Read-only token:", readToken);
+	console.log("[mcp] Tokens saved to", tokenFilePath, "(mode 0600)");
 
 	return config;
 }

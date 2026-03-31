@@ -60,6 +60,7 @@ const READ_TOOLS = [
 	"phantom_config",
 	"phantom_history",
 	"phantom_metrics",
+	"phantom_conversation_history",
 	"phantom_list_dynamic_tools",
 	"phantom_codebase_query",
 	"phantom_pr_status",
@@ -82,9 +83,9 @@ describe("getRequiredScope", () => {
 		expect(getRequiredScope("phantom_nonexistent")).toBe("admin");
 	});
 
-	test("returns correct scope for all 17 built-in tools", () => {
-		// Verify we actually have 17 entries
-		expect(Object.keys(TOOL_SCOPES)).toHaveLength(17);
+	test("returns correct scope for all 18 built-in tools", () => {
+		// Verify we actually have 18 entries
+		expect(Object.keys(TOOL_SCOPES)).toHaveLength(18);
 
 		for (const tool of READ_TOOLS) {
 			expect(getRequiredScope(tool)).toBe("read");

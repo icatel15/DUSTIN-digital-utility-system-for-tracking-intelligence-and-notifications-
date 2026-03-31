@@ -85,7 +85,10 @@ function generateChannelsYaml(slack: SlackAnswers): string {
   app_token: \${SLACK_APP_TOKEN}
   # default_channel_id: C04ABC123
   # default_user_id: U04ABC123
-  # owner_user_id: U04ABC123`;
+  # owner_user_id: U04ABC123
+  # delivery_allowlist:
+  #   - C04ABC123  # allowed channels for /trigger delivery
+  #   - U04ABC123  # allowed users for /trigger delivery`;
 
 	return `# Channel configuration
 # Environment variables are substituted at load time: \${VAR_NAME}
@@ -193,7 +196,7 @@ export async function runInit(args: string[]): Promise<void> {
 			name: values.name ?? envName ?? "phantom",
 			role: values.role ?? envRole ?? "swe",
 			port: values.port ? Number.parseInt(values.port, 10) : envPort ? Number.parseInt(envPort, 10) : 3100,
-			model: envModel ?? "claude-sonnet-4-6",
+			model: envModel ?? "claude-haiku-4-5",
 			domain: envDomain,
 			effort: envEffort,
 		};
@@ -218,7 +221,7 @@ export async function runInit(args: string[]): Promise<void> {
 				port: values.port
 					? Number.parseInt(values.port, 10)
 					: Number.parseInt(await prompt(rl, "HTTP port", "3100"), 10),
-				model: await prompt(rl, "Model (claude-sonnet-4-6, claude-opus-4-6)", "claude-sonnet-4-6"),
+				model: await prompt(rl, "Model (claude-haiku-4-5, claude-sonnet-4-6, claude-opus-4-6)", "claude-haiku-4-5"),
 			};
 
 			console.log("\nSlack setup (optional, press Enter to skip):");
@@ -254,6 +257,8 @@ export async function runInit(args: string[]): Promise<void> {
 
 	const mcp = generateMcpYaml();
 	writeFileSync("config/mcp.yaml", mcp.yaml);
+	const tokenContent = `admin=${mcp.adminToken}\noperator=${mcp.operatorToken}\nread=${mcp.readToken}\n`;
+	writeFileSync("config/.mcp-tokens", tokenContent, { mode: 0o600 });
 	console.log("  Created config/mcp.yaml");
 
 	writeFileSync("config/channels.yaml", generateChannelsYaml(slackAnswers));
@@ -286,10 +291,20 @@ export async function runInit(args: string[]): Promise<void> {
 	console.log("  Created phantom-config/ with initial files");
 
 	console.log("\nPhantom initialized.\n");
-	console.log("MCP tokens (save these, they will not be shown again):");
-	console.log(`  Admin:    ${mcp.adminToken}`);
-	console.log(`  Operator: ${mcp.operatorToken}`);
-	console.log(`  Read:     ${mcp.readToken}`);
+
+	if (values.yes) {
+		// Unattended mode: never print raw tokens to stdout (they end up in container/CI logs)
+		console.log("  MCP tokens written to config/.mcp-tokens (mode 0600)");
+		console.log("  Retrieve them with: cat config/.mcp-tokens");
+	} else {
+		// Interactive mode: user is at terminal, safe to display
+		console.log("MCP tokens (also saved to config/.mcp-tokens):");
+		console.log(`  Admin:    ${mcp.adminToken}`);
+		console.log(`  Operator: ${mcp.operatorToken}`);
+		console.log(`  Read:     ${mcp.readToken}`);
+		console.log("\n  Connect from Claude Code:");
+		console.log(`     claude mcp add phantom -- curl -H "Authorization: Bearer ${mcp.adminToken}" https://your-host/mcp`);
+	}
 
 	if (slackAnswers.botToken) {
 		console.log("\nSlack is configured. On first start, Phantom will introduce itself.");
@@ -299,6 +314,4 @@ export async function runInit(args: string[]): Promise<void> {
 	console.log("  1. Set ANTHROPIC_API_KEY in your environment");
 	console.log("  2. Start Docker services: docker compose up -d");
 	console.log("  3. Start Phantom: phantom start");
-	console.log("  4. Connect from Claude Code:");
-	console.log(`     claude mcp add phantom -- curl -H "Authorization: Bearer ${mcp.adminToken}" https://your-host/mcp`);
 }
