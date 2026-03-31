@@ -2,10 +2,10 @@ import { relative, resolve } from "node:path";
 import type { SupabaseClient } from "../db/connection.ts";
 import { createSSEResponse } from "./events.ts";
 import { loginPageHtml } from "./login-page.ts";
-import { consumeMagicLink, createSession, isValidSession } from "./session.ts";
+import { consumeMagicLink, createBoundSession, createSession, getSessionRequestId, isValidSession } from "./session.ts";
 
 import { secretsExpiredHtml, secretsFormHtml } from "../secrets/form-page.ts";
-import { getSecretRequest, saveSecrets, validateMagicToken } from "../secrets/store.ts";
+import { getSecretRequest, saveSecrets, validateAndConsumeMagicToken } from "../secrets/store.ts";
 
 const COOKIE_NAME = "phantom_session";
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
@@ -94,6 +94,12 @@ export async function handleUiRequest(req: Request): Promise<Response> {
 		if (!isAuthenticated(req)) {
 			return Response.json({ error: "Unauthorized" }, { status: 401 });
 		}
+		// Session must be bound to this exact requestId — generic UI sessions are rejected
+		const sessionCookie = getSessionCookie(req);
+		const boundRequestId = sessionCookie ? getSessionRequestId(sessionCookie) : null;
+		if (boundRequestId !== secretSaveMatch[1]) {
+			return Response.json({ error: "Session not bound to this request" }, { status: 403 });
+		}
 		return handleSecretSave(req, secretSaveMatch[1]);
 	}
 
@@ -176,9 +182,10 @@ async function handleSecretFormGet(_req: Request, url: URL, requestId: string): 
 		});
 	}
 
-	// Authenticate via magic token and set session cookie
-	if (magicToken && (await validateMagicToken(secretsDb, requestId, magicToken))) {
-		const { sessionToken } = createSession();
+	// Atomically validate and consume magic token in a single DB update (CAS).
+	// Two concurrent requests cannot both succeed.
+	if (magicToken && (await validateAndConsumeMagicToken(secretsDb, requestId, magicToken))) {
+		const { sessionToken } = createBoundSession(requestId);
 		return new Response(secretsFormHtml(request), {
 			headers: {
 				"Content-Type": "text/html; charset=utf-8",
@@ -187,8 +194,16 @@ async function handleSecretFormGet(_req: Request, url: URL, requestId: string): 
 		});
 	}
 
-	// If already authenticated via cookie, show the form
+	// If already authenticated via cookie, session must be bound to this exact requestId
 	if (_req && isAuthenticated(_req)) {
+		const sessionCookie = getSessionCookie(_req);
+		const boundRequestId = sessionCookie ? getSessionRequestId(sessionCookie) : null;
+		if (boundRequestId !== requestId) {
+			return new Response(secretsExpiredHtml(), {
+				status: 403,
+				headers: { "Content-Type": "text/html; charset=utf-8" },
+			});
+		}
 		return new Response(secretsFormHtml(request), {
 			headers: { "Content-Type": "text/html; charset=utf-8" },
 		});

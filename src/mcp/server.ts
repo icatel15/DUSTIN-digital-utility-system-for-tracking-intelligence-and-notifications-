@@ -87,7 +87,7 @@ export class PhantomMcpServer {
 			dynamicTools,
 		);
 
-		server.transportManager = new McpTransportManager(() => server.createMcpServer());
+		server.transportManager = new McpTransportManager(() => server.createMcpServer(), auth);
 
 		return server;
 	}

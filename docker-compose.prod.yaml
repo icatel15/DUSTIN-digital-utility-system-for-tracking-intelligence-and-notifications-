@@ -1,0 +1,8 @@
+# Production override — bind port to localhost only.
+# Usage: docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d
+# Requires a reverse proxy (Caddy, nginx, etc.) for external HTTPS access.
+
+services:
+  dustin:
+    ports:
+      - "127.0.0.1:${PORT:-3100}:3100"

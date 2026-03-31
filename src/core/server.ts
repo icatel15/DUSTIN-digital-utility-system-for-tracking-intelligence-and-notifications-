@@ -1,6 +1,9 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { AgentRuntime } from "../agent/runtime.ts";
 import type { SlackChannel } from "../channels/slack.ts";
 import type { PhantomConfig } from "../config/types.ts";
+import type { AuditLogger } from "../mcp/audit.ts";
+import type { RateLimiter } from "../mcp/rate-limiter.ts";
 import type { PhantomMcpServer } from "../mcp/server.ts";
 import type { MemoryHealth } from "../memory/types.ts";
 import { handleUiRequest } from "../ui/serve.ts";
@@ -15,10 +18,12 @@ type RoleInfoProvider = () => { id: string; name: string } | null;
 type OnboardingStatusProvider = () => string | Promise<string>;
 type WebhookHandler = (req: Request) => Promise<Response>;
 type PeerHealthProvider = () => Record<string, { healthy: boolean; latencyMs: number; error?: string }>;
-type TriggerDeps = {
+export type TriggerDeps = {
 	runtime: AgentRuntime;
 	slackChannel?: SlackChannel;
 	ownerUserId?: string;
+	audit?: AuditLogger;
+	rateLimiter?: RateLimiter;
 };
 
 let memoryHealthProvider: MemoryHealthProvider | null = null;
@@ -141,9 +146,83 @@ export function startServer(config: PhantomConfig, startedAt: number): ReturnTyp
 	return server;
 }
 
+function verifyTriggerAuth(req: Request): boolean {
+	const triggerSecret = process.env.TRIGGER_SECRET;
+	if (!triggerSecret) return false;
+
+	const authHeader = req.headers.get("Authorization");
+	if (!authHeader?.startsWith("Bearer ")) return false;
+
+	const token = authHeader.slice(7).trim();
+	if (!token) return false;
+
+	try {
+		const expected = Buffer.from(triggerSecret);
+		const actual = Buffer.from(token);
+		if (expected.length !== actual.length) return false;
+		return timingSafeEqual(expected, actual);
+	} catch {
+		return false;
+	}
+}
+
+function hashTaskForAudit(task: string): string {
+	return createHash("sha256").update(task).digest("hex").slice(0, 16);
+}
+
 async function handleTrigger(req: Request): Promise<Response> {
+	const triggerSecret = process.env.TRIGGER_SECRET;
+
+	// Feature disabled when TRIGGER_SECRET is unset — return 404 to avoid revealing the endpoint
+	if (!triggerSecret) {
+		return Response.json({ error: "Not found" }, { status: 404 });
+	}
+
 	if (!triggerDeps) {
-		return Response.json({ status: "error", message: "Trigger not configured" }, { status: 503 });
+		return Response.json({ error: "Not found" }, { status: 404 });
+	}
+
+	// Authenticate
+	if (!verifyTriggerAuth(req)) {
+		// Log rejected auth attempt without parsing body
+		if (triggerDeps.audit) {
+			await triggerDeps.audit.log({
+				client_name: "trigger:unauthenticated",
+				method: "POST /trigger",
+				tool_name: null,
+				resource_uri: null,
+				input_summary: null,
+				output_summary: "Authentication failed",
+				cost_usd: 0,
+				duration_ms: 0,
+				status: "error",
+			});
+		}
+		return Response.json({ status: "error", message: "Unauthorized" }, { status: 401 });
+	}
+
+	// Rate limit
+	if (triggerDeps.rateLimiter) {
+		const rateResult = triggerDeps.rateLimiter.check("trigger");
+		if (!rateResult.allowed) {
+			if (triggerDeps.audit) {
+				await triggerDeps.audit.log({
+					client_name: "trigger",
+					method: "POST /trigger",
+					tool_name: null,
+					resource_uri: null,
+					input_summary: null,
+					output_summary: "Rate limited",
+					cost_usd: 0,
+					duration_ms: 0,
+					status: "error",
+				});
+			}
+			return Response.json(
+				{ status: "error", message: "Rate limit exceeded" },
+				{ status: 429, headers: { "Retry-After": String(rateResult.retryAfter) } },
+			);
+		}
 	}
 
 	let body: { task?: string; delivery?: { channel?: string; target?: string }; source?: string };
@@ -159,13 +238,13 @@ async function handleTrigger(req: Request): Promise<Response> {
 
 	const conversationId = `trigger:${Date.now()}`;
 	const source = body.source ?? "http";
+	const deliveryTarget = body.delivery?.target ?? "owner";
 
 	try {
 		const response = await triggerDeps.runtime.handleMessage("trigger", conversationId, body.task);
 
 		// Deliver via Slack if requested
 		const deliveryChannel = body.delivery?.channel ?? "slack";
-		const deliveryTarget = body.delivery?.target ?? "owner";
 
 		if (deliveryChannel === "slack" && triggerDeps.slackChannel) {
 			if (deliveryTarget === "owner" && triggerDeps.ownerUserId) {
@@ -175,6 +254,21 @@ async function handleTrigger(req: Request): Promise<Response> {
 			} else if (deliveryTarget.startsWith("U")) {
 				await triggerDeps.slackChannel.sendDm(deliveryTarget, response.text);
 			}
+		}
+
+		// Audit log: metadata only, no raw task text
+		if (triggerDeps.audit) {
+			await triggerDeps.audit.log({
+				client_name: "trigger",
+				method: "POST /trigger",
+				tool_name: null,
+				resource_uri: null,
+				input_summary: `source=${source} target=${deliveryTarget} len=${body.task.length} hash=${hashTaskForAudit(body.task)}`,
+				output_summary: `conversationId=${conversationId}`,
+				cost_usd: response.cost.totalUsd,
+				duration_ms: response.durationMs,
+				status: "success",
+			});
 		}
 
 		return Response.json({

@@ -5,7 +5,7 @@
  */
 
 import { randomUUID, timingSafeEqual } from "node:crypto";
-import { isSafeCallbackUrl } from "../utils/url-validator.ts";
+import { isSafeCallbackUrl, isSafeCallbackUrlAsync } from "../utils/url-validator.ts";
 import type { Channel, ChannelCapabilities, InboundMessage, OutboundMessage, SentMessage } from "./types.ts";
 
 export type WebhookChannelConfig = {
@@ -170,7 +170,7 @@ export class WebhookChannel implements Channel {
 
 		// Async mode: return immediately, send response to callback URL
 		if (payload.callback_url) {
-			const validation = isSafeCallbackUrl(payload.callback_url);
+			const validation = await isSafeCallbackUrlAsync(payload.callback_url);
 			if (!validation.safe) {
 				return Response.json(
 					{ status: "error", message: `Invalid callback URL: ${validation.reason}` },
@@ -231,16 +231,29 @@ export class WebhookChannel implements Channel {
 	}
 
 	private async sendCallback(url: string, conversationId: string, text: string): Promise<void> {
+		// Defense-in-depth: re-validate URL at fetch time (DNS may have changed)
+		const recheck = await isSafeCallbackUrlAsync(url);
+		if (!recheck.safe) {
+			console.error(`[webhook] Callback URL failed re-validation: ${url} (${recheck.reason})`);
+			return;
+		}
+
 		try {
-			await fetch(url, {
+			const response = await fetch(url, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
+				redirect: "manual",
 				body: JSON.stringify({
 					conversation_id: conversationId.replace("webhook:", ""),
 					status: "complete",
 					response: text,
 				}),
 			});
+
+			// Treat redirect responses as failure
+			if (response.status >= 300 && response.status < 400) {
+				console.error(`[webhook] Callback returned redirect (${response.status}), treating as failure: ${url}`);
+			}
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : String(err);
 			console.error(`[webhook] Failed to send callback to ${url}: ${msg}`);

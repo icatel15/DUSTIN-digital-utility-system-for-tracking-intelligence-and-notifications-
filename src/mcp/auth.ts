@@ -54,7 +54,7 @@ export class AuthMiddleware {
 	}
 }
 
-// Scope requirements for each tool/method
+// Scope requirements for each tool/method — all 17 built-in tools
 const TOOL_SCOPES: Record<string, McpScope> = {
 	phantom_ask: "operator",
 	phantom_status: "read",
@@ -67,8 +67,17 @@ const TOOL_SCOPES: Record<string, McpScope> = {
 	phantom_register_tool: "admin",
 	phantom_unregister_tool: "admin",
 	phantom_list_dynamic_tools: "read",
+	phantom_codebase_query: "read",
+	phantom_pr_status: "read",
+	phantom_ci_status: "read",
+	phantom_review_request: "operator",
+	phantom_deploy_status: "read",
+	phantom_repo_info: "read",
 };
 
+export { TOOL_SCOPES };
+
 export function getRequiredScope(toolName: string): McpScope {
-	return TOOL_SCOPES[toolName] ?? "read";
+	// Default deny: unknown tools (including dynamic tools) require admin
+	return TOOL_SCOPES[toolName] ?? "admin";
 }

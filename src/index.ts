@@ -31,6 +31,8 @@ import {
 import { closeDatabase, getDatabase } from "./db/connection.ts";
 import { runMigrations } from "./db/migrate.ts";
 import { createEmailToolServer } from "./email/tool.ts";
+import { AuditLogger } from "./mcp/audit.ts";
+import { RateLimiter } from "./mcp/rate-limiter.ts";
 import { EvolutionEngine } from "./evolution/engine.ts";
 import type { SessionSummary } from "./evolution/types.ts";
 import { PeerHealthMonitor } from "./mcp/peer-health.ts";
@@ -607,11 +609,15 @@ async function main(): Promise<void> {
 		await scheduler.start();
 	}
 
-	// Wire /trigger endpoint
+	// Wire /trigger endpoint with auth, rate limiting, and audit logging
+	const triggerAudit = new AuditLogger(db);
+	const triggerRateLimiter = new RateLimiter({ requests_per_minute: 30, burst: 5 });
 	setTriggerDeps({
 		runtime,
 		slackChannel: slackChannel ?? undefined,
 		ownerUserId: channelsConfig?.slack?.owner_user_id,
+		audit: triggerAudit,
+		rateLimiter: triggerRateLimiter,
 	});
 
 	// Wire secret save notification: when the user saves credentials via the form,

@@ -58,10 +58,14 @@ Phantom is a single Bun process that runs on a VM. It combines an agent runtime,
 
 ### HTTP Server
 
-`src/core/server.ts` - Bun.serve() on port 3100. Three routes:
+`src/core/server.ts` - Bun.serve() on port 3100. Routes:
 - `/health` - JSON health status (status, uptime, version, channels, memory, evolution)
 - `/mcp` - MCP Streamable HTTP endpoint
+- `/trigger` - POST-only agent task endpoint (requires `TRIGGER_SECRET` bearer token; returns 404 when unset)
 - `/webhook` - Inbound webhook receiver
+- `/ui/*` - Secrets UI and static assets
+
+**Production deployment**: Port 3100 is bound to `127.0.0.1` only via `docker-compose.prod.yaml`. External HTTPS access requires a reverse proxy (Caddy, nginx, etc.) in front of the container. The deploy workflow uses `docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d`.
 
 ### Channel Router
 

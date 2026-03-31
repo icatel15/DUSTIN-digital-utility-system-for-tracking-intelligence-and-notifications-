@@ -4,6 +4,7 @@ type Session = {
 	token: string;
 	createdAt: number;
 	expiresAt: number;
+	requestId: string | null;
 };
 
 type MagicLink = {
@@ -28,6 +29,7 @@ export function createSession(): { sessionToken: string; magicToken: string } {
 		token: sessionToken,
 		createdAt: now,
 		expiresAt: now + SESSION_TTL_MS,
+		requestId: null,
 	});
 
 	magicLinks.set(magicToken, {
@@ -38,6 +40,38 @@ export function createSession(): { sessionToken: string; magicToken: string } {
 	});
 
 	return { sessionToken, magicToken };
+}
+
+export function createBoundSession(requestId: string): { sessionToken: string; magicToken: string } {
+	const sessionToken = randomBytes(32).toString("base64url");
+	const magicToken = randomBytes(24).toString("base64url");
+	const now = Date.now();
+
+	sessions.set(sessionToken, {
+		token: sessionToken,
+		createdAt: now,
+		expiresAt: now + SESSION_TTL_MS,
+		requestId,
+	});
+
+	magicLinks.set(magicToken, {
+		token: magicToken,
+		sessionToken,
+		expiresAt: now + MAGIC_LINK_TTL_MS,
+		used: false,
+	});
+
+	return { sessionToken, magicToken };
+}
+
+export function getSessionRequestId(token: string): string | null {
+	const session = sessions.get(token);
+	if (!session) return null;
+	if (Date.now() > session.expiresAt) {
+		sessions.delete(token);
+		return null;
+	}
+	return session.requestId;
 }
 
 export function isValidSession(token: string): boolean {

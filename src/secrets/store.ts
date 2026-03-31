@@ -100,15 +100,47 @@ export async function getSecretRequest(db: SupabaseClient, requestId: string): P
 export async function validateMagicToken(db: SupabaseClient, requestId: string, magicToken: string): Promise<boolean> {
 	const { data, error } = await db
 		.from("secret_requests")
-		.select("magic_token_hash, status, expires_at")
+		.select("magic_token_hash, magic_token_used, status, expires_at")
 		.eq("request_id", requestId)
 		.single();
 
 	if (error || !data) return false;
 	if (data.status !== "pending") return false;
 	if (new Date(data.expires_at) < new Date()) return false;
+	if (data.magic_token_used) return false;
 
 	return data.magic_token_hash === hashToken(magicToken);
+}
+
+/**
+ * Atomically validate and consume a magic token in a single UPDATE.
+ * Returns true only if exactly one row was updated (the token was valid,
+ * unused, pending, and not expired). Two concurrent callers cannot both
+ * succeed because the WHERE clause includes magic_token_used = false.
+ */
+export async function validateAndConsumeMagicToken(
+	db: SupabaseClient,
+	requestId: string,
+	magicToken: string,
+): Promise<boolean> {
+	const hash = hashToken(magicToken);
+
+	// Single atomic UPDATE that acts as compare-and-swap:
+	// only matches if hash matches, token is unused, request is pending, and not expired.
+	const { data, error } = await db
+		.from("secret_requests")
+		.update({ magic_token_used: true })
+		.eq("request_id", requestId)
+		.eq("magic_token_hash", hash)
+		.eq("magic_token_used", false)
+		.eq("status", "pending")
+		.gte("expires_at", new Date().toISOString())
+		.select("request_id");
+
+	if (error) return false;
+
+	// data is an array — exactly one row means the CAS succeeded
+	return Array.isArray(data) && data.length === 1;
 }
 
 export async function saveSecrets(
@@ -125,11 +157,27 @@ export async function saveSecrets(
 	const fieldMap = new Map(request.fields.map((f) => [f.name, f]));
 	const now = new Date().toISOString();
 
+	// Reject undeclared field names
+	for (const name of Object.keys(secrets)) {
+		if (!fieldMap.has(name)) {
+			throw new Error(`Undeclared field: ${name}`);
+		}
+	}
+
+	// Enforce required fields
+	const missingRequired = request.fields
+		.filter((f) => f.required && (!secrets[f.name] || !secrets[f.name].trim()))
+		.map((f) => f.name);
+	if (missingRequired.length > 0) {
+		throw new Error(`Missing required fields: ${missingRequired.join(", ")}`);
+	}
+
 	for (const [name, value] of Object.entries(secrets)) {
 		if (!value.trim()) continue;
 
 		const field = fieldMap.get(name);
-		const fieldType = field?.type ?? "password";
+		if (!field) continue; // Already validated above, but defensive
+		const fieldType = field.type ?? "password";
 		const { encrypted, iv, authTag } = encryptSecret(value);
 
 		const { error } = await db.from("secrets").upsert(
@@ -149,6 +197,11 @@ export async function saveSecrets(
 
 		saved.push(name);
 		console.log(`[secrets] Stored secret: ${name}`);
+	}
+
+	// Reject empty submissions
+	if (saved.length === 0) {
+		throw new Error("No secrets were provided");
 	}
 
 	// Mark request as completed

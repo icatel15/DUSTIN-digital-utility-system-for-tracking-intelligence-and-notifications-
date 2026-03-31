@@ -32,7 +32,9 @@ function bodyField<T>(body: unknown, ...keys: string[]): T | undefined {
 	return obj as unknown as T | undefined;
 }
 
-export function registerSlackActions(app: App): void {
+export type OwnerChecker = (userId: string) => boolean;
+
+export function registerSlackActions(app: App, isOwner?: OwnerChecker): void {
 	// Register feedback button handlers
 	for (const actionId of FEEDBACK_ACTION_IDS) {
 		app.action(actionId, async ({ ack, body, client }) => {
@@ -51,6 +53,12 @@ export function registerSlackActions(app: App): void {
 			const threadTs = bodyField<string>(b, "message", "thread_ts") ?? messageTs;
 			const messageText = bodyField<string>(b, "message", "text") ?? "";
 			const existingBlocks = bodyField<Array<{ type: string; block_id?: string }>>(b, "message", "blocks") ?? [];
+
+			// Owner gate: drop non-owner clicks silently
+			if (isOwner && userId && !isOwner(userId)) {
+				console.log(`[slack] Dropping feedback from non-owner: ${userId}`);
+				return;
+			}
 
 			if (!channelId || !messageTs || !userId) return;
 
@@ -101,6 +109,12 @@ export function registerSlackActions(app: App): void {
 		const channelId = bodyField<string>(b, "channel", "id");
 		const messageTs = bodyField<string>(b, "message", "ts");
 		const userId = bodyField<string>(b, "user", "id");
+
+		// Owner gate: drop non-owner clicks silently
+		if (isOwner && userId && !isOwner(userId)) {
+			console.log(`[slack] Dropping action from non-owner: ${userId}`);
+			return;
+		}
 		const threadTs = bodyField<string>(b, "message", "thread_ts") ?? messageTs;
 		const messageText = bodyField<string>(b, "message", "text") ?? "";
 		const existingBlocks = bodyField<Array<{ type: string; block_id?: string }>>(b, "message", "blocks") ?? [];

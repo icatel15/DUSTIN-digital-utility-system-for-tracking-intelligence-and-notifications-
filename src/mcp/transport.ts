@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import type { AuthMiddleware } from "./auth.ts";
+import { getRequiredScope } from "./auth.ts";
 import type { AuthResult } from "./types.ts";
 
 type SessionEntry = {
@@ -13,9 +15,11 @@ type SessionEntry = {
 export class McpTransportManager {
 	private sessions = new Map<string, SessionEntry>();
 	private serverFactory: () => McpServer;
+	private authMiddleware: AuthMiddleware | null;
 
-	constructor(serverFactory: () => McpServer) {
+	constructor(serverFactory: () => McpServer, authMiddleware?: AuthMiddleware) {
 		this.serverFactory = serverFactory;
+		this.authMiddleware = authMiddleware ?? null;
 	}
 
 	async handleRequest(req: Request, auth: AuthResult): Promise<Response> {
@@ -33,7 +37,20 @@ export class McpTransportManager {
 		// Existing session
 		if (sessionId && this.sessions.has(sessionId)) {
 			const entry = this.sessions.get(sessionId);
-			if (entry) return entry.transport.handleRequest(req);
+			if (!entry) return jsonRpcError(-32000, "Unknown session.", null, 400);
+
+			// Session-to-client binding: reject if authenticated client doesn't match session creator
+			if (auth.authenticated && entry.clientName !== auth.clientName) {
+				return jsonRpcError(-32001, "Session belongs to a different client", null, 403);
+			}
+
+			// Scope check for tool calls on existing sessions
+			if (method === "POST" && this.authMiddleware) {
+				const scopeCheck = await this.checkToolScope(req, auth);
+				if (scopeCheck) return scopeCheck;
+			}
+
+			return entry.transport.handleRequest(req);
 		}
 
 		// New session via initialize request
@@ -60,6 +77,33 @@ export class McpTransportManager {
 
 		// GET/DELETE without valid session
 		return jsonRpcError(-32000, "Invalid or missing session", null, 400);
+	}
+
+	private async checkToolScope(req: Request, auth: AuthResult): Promise<Response | null> {
+		if (!this.authMiddleware || !auth.authenticated) return null;
+
+		try {
+			const clone = req.clone();
+			const body = await clone.json();
+			if (body?.method !== "tools/call") return null;
+
+			const toolName = body?.params?.name;
+			if (!toolName || typeof toolName !== "string") return null;
+
+			const requiredScope = getRequiredScope(toolName);
+			if (!this.authMiddleware.hasScope(auth, requiredScope)) {
+				return jsonRpcError(
+					-32001,
+					`Insufficient scope: tool '${toolName}' requires '${requiredScope}'`,
+					body?.id ?? null,
+					403,
+				);
+			}
+		} catch {
+			// If body parsing fails, let it through — the transport will handle the error
+		}
+
+		return null;
 	}
 
 	private async createSession(req: Request, body: unknown, auth: AuthResult): Promise<Response> {

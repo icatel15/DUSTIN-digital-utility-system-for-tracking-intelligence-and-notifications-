@@ -156,4 +156,42 @@ describe("WebhookChannel", () => {
 		await channel2.disconnect();
 		expect(channel2.isConnected()).toBe(false);
 	});
+
+	test("sendCallback uses redirect:manual and treats redirect as failure", async () => {
+		const fetchCalls: Array<{ url: string; opts: RequestInit }> = [];
+		const origFetch = globalThis.fetch;
+		// Capture console.error to verify the redirect failure is logged
+		const errorLogs: string[] = [];
+		const origError = console.error;
+		console.error = (...args: unknown[]) => errorLogs.push(args.join(" "));
+
+		globalThis.fetch = (async (url: string | URL | Request, opts?: RequestInit) => {
+			fetchCalls.push({ url: String(url), opts: opts ?? {} });
+			// Simulate a 302 redirect response
+			return new Response(null, { status: 302, headers: { Location: "http://evil.com" } });
+		}) as typeof fetch;
+
+		try {
+			const testChannel = new WebhookChannel(testConfig);
+			await testChannel.connect();
+
+			const callbackUrls = (testChannel as unknown as { callbackUrls: Map<string, string> }).callbackUrls;
+			callbackUrls.set("webhook:test_conv", "https://8.8.8.8/callback");
+
+			await testChannel.send("webhook:test_conv", { text: "test response" });
+
+			// Verify fetch was called with redirect: "manual"
+			expect(fetchCalls.length).toBe(1);
+			expect(fetchCalls[0].opts.redirect).toBe("manual");
+
+			// Verify the redirect was treated as failure and logged
+			expect(errorLogs.some((msg) => msg.includes("redirect") && msg.includes("302"))).toBe(true);
+
+			// Verify the callback URL was consumed (removed from map after send)
+			expect(callbackUrls.has("webhook:test_conv")).toBe(false);
+		} finally {
+			globalThis.fetch = origFetch;
+			console.error = origError;
+		}
+	});
 });

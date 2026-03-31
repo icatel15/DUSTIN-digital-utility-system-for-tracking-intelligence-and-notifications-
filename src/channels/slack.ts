@@ -97,7 +97,7 @@ export class SlackChannel implements Channel {
 		this.connectionState = "connecting";
 
 		this.registerEventHandlers();
-		registerSlackActions(this.app);
+		registerSlackActions(this.app, (userId) => this.isOwner(userId));
 
 		try {
 			await this.app.start();
@@ -378,6 +378,8 @@ export class SlackChannel implements Channel {
 		});
 
 		this.app.event("reaction_added", async ({ event }) => {
+			if (!this.isOwner(event.user)) return;
+
 			const reaction = event.reaction;
 			const isPositive =
 				reaction === "+1" || reaction === "thumbsup" || reaction === "heart" || reaction === "white_check_mark";
