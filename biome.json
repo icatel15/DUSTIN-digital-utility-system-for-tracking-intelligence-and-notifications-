@@ -43,6 +43,6 @@
     }
   ],
   "files": {
-    "ignore": ["node_modules", "dist", "*.json"]
+    "ignore": ["node_modules", "dist", "dashboard", "public", "*.json"]
   }
 }

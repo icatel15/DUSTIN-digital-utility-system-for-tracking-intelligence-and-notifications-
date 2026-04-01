@@ -16,6 +16,7 @@ import { createStatusReactionController } from "./channels/status-reactions.ts";
 import { TelegramChannel } from "./channels/telegram.ts";
 import { WebhookChannel } from "./channels/webhook.ts";
 import { loadChannelsConfig, loadConfig } from "./config/loader.ts";
+import { setAdminConfig, setAdminHealthProvider } from "./core/admin-api.ts";
 import { installShutdownHandlers, onShutdown } from "./core/graceful.ts";
 import {
 	setChannelHealthProvider,
@@ -66,6 +67,9 @@ async function main(): Promise<void> {
 
 	// Set web UI public directory
 	setPublicDir(resolve(process.cwd(), "public"));
+
+	// Wire admin API
+	setAdminConfig(config);
 
 	// Load role system
 	const roleRegistry = createRoleRegistry();
@@ -612,6 +616,16 @@ async function main(): Promise<void> {
 
 		// Clean up
 		statusReactions?.dispose();
+	});
+
+	// Wire admin health provider — fetches /health internally to avoid duplicating logic
+	setAdminHealthProvider(async () => {
+		try {
+			const res = await fetch(`http://localhost:${config.port}/health`);
+			return (await res.json()) as Record<string, unknown>;
+		} catch {
+			return { status: "unknown" };
+		}
 	});
 
 	const server = startServer(config, startedAt);

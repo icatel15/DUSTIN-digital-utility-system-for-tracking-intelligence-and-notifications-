@@ -37,11 +37,12 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 | 5 | Web Dashboard | [-] Spec approved (`docs/specs/phase-5-web-dashboard.md`) |
 | 6 | CI/CD Pipeline & Deployment Hardening | [x] Complete |
 | 7 | Continuous Context Management | [ ] Draft spec (`docs/specs/phase-7-continuous-context.md`) |
+| 8 | Multi-Model Routing | [-] Spec approved (`docs/specs/phase-8-multi-model-routing.md`) |
 
 ## Outstanding Work
 
 - [ ] Add Tash's Telegram user ID for partner access
-- [ ] Custom domain + Caddy HTTPS
+- [ ] Custom domain + Caddy HTTPS (blocker: need to purchase a domain; Caddy is installed on VPS but unconfigured; `ghostwright.dev` belongs to upstream Phantom project, not us)
 - [ ] Notion integration (Phase 3)
 - [ ] Email via Resend (Phase 4)
 - [ ] Web admin dashboard (Phase 5)

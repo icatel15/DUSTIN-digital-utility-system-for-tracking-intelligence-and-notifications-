@@ -20,10 +20,12 @@ function clearPhantomEnv() {
 		PHANTOM_NAME: process.env.PHANTOM_NAME,
 		PHANTOM_ROLE: process.env.PHANTOM_ROLE,
 		PHANTOM_MODEL: process.env.PHANTOM_MODEL,
+		PHANTOM_EFFORT: process.env.PHANTOM_EFFORT,
 	};
 	process.env.PHANTOM_NAME = undefined;
 	process.env.PHANTOM_ROLE = undefined;
 	process.env.PHANTOM_MODEL = undefined;
+	process.env.PHANTOM_EFFORT = undefined;
 	return saved;
 }
 function restorePhantomEnv(saved: Record<string, string | undefined>) {

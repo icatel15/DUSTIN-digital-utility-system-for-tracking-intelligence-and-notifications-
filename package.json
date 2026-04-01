@@ -13,7 +13,8 @@
     "lint:fix": "biome check --write src/",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "format": "biome format --write src/"
+    "format": "biome format --write src/",
+    "dashboard:build": "cd dashboard && bun run build"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.77",

@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { resolve } from "node:path";
 import type { AgentRuntime } from "../agent/runtime.ts";
 import type { SlackChannel } from "../channels/slack.ts";
 import type { PhantomConfig } from "../config/types.ts";
@@ -7,6 +8,8 @@ import type { RateLimiter } from "../mcp/rate-limiter.ts";
 import type { PhantomMcpServer } from "../mcp/server.ts";
 import type { MemoryHealth } from "../memory/types.ts";
 import { handleUiRequest } from "../ui/serve.ts";
+import { consumeMagicLink, isValidSession } from "../ui/session.ts";
+import { handleAdminRequest } from "./admin-api.ts";
 
 const VERSION = "0.18.1";
 
@@ -133,6 +136,15 @@ export function startServer(config: PhantomConfig, startedAt: number): ReturnTyp
 					return Response.json({ status: "error", message: "Webhook channel not configured" }, { status: 503 });
 				}
 				return webhookHandler(req);
+			}
+
+			if (url.pathname.startsWith("/api/admin/")) {
+				const adminResponse = await handleAdminRequest(req);
+				if (adminResponse) return adminResponse;
+			}
+
+			if (url.pathname === "/dashboard" || url.pathname.startsWith("/dashboard/")) {
+				return handleDashboardRequest(req, config);
 			}
 
 			if (url.pathname.startsWith("/ui")) {
@@ -306,4 +318,70 @@ async function handleTrigger(req: Request): Promise<Response> {
 		const msg = err instanceof Error ? err.message : String(err);
 		return Response.json({ status: "error", message: msg }, { status: 500 });
 	}
+}
+
+const COOKIE_NAME = "phantom_session";
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60;
+
+function getDashboardSessionCookie(req: Request): string | null {
+	const cookies = req.headers.get("Cookie") ?? "";
+	const match = cookies.match(/(?:^|;\s*)phantom_session=([^;]*)/);
+	return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function handleDashboardRequest(req: Request, _config: PhantomConfig): Promise<Response> {
+	const url = new URL(req.url);
+
+	// Handle magic link auth on /dashboard
+	const magicToken = url.searchParams.get("magic");
+	if (magicToken) {
+		const sessionToken = consumeMagicLink(magicToken);
+		if (sessionToken) {
+			return new Response(null, {
+				status: 302,
+				headers: {
+					Location: "/dashboard",
+					"Set-Cookie": `${COOKIE_NAME}=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${COOKIE_MAX_AGE}`,
+				},
+			});
+		}
+	}
+
+	// Check session auth
+	const token = getDashboardSessionCookie(req);
+	if (!token || !isValidSession(token)) {
+		const accept = req.headers.get("Accept") ?? "";
+		if (accept.includes("text/html")) {
+			return Response.redirect("/ui/login", 302);
+		}
+		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	}
+
+	// Serve static assets from public/dashboard/
+	const publicDir = resolve(process.cwd(), "public");
+	const assetPath = url.pathname.slice("/dashboard".length);
+
+	if (assetPath && assetPath !== "/" && assetPath !== "") {
+		const filePath = resolve(publicDir, "dashboard", assetPath.replace(/^\/+/, ""));
+		if (!filePath.startsWith(resolve(publicDir, "dashboard"))) {
+			return new Response("Forbidden", { status: 403 });
+		}
+		const file = Bun.file(filePath);
+		if (await file.exists()) {
+			return new Response(file, {
+				headers: { "Cache-Control": "no-cache" },
+			});
+		}
+	}
+
+	// SPA fallback — serve index.html
+	const indexPath = resolve(publicDir, "dashboard", "index.html");
+	const indexFile = Bun.file(indexPath);
+	if (await indexFile.exists()) {
+		return new Response(indexFile, {
+			headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" },
+		});
+	}
+
+	return new Response("Dashboard not built. Run: bun run dashboard:build", { status: 404 });
 }
