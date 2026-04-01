@@ -47,14 +47,12 @@ DUSTIN (Digital Utility System for Tracking, Intelligence & Notifications)
 - [ ] Email via Resend (Phase 4)
 - [ ] Web admin dashboard (Phase 5)
 - [ ] Remove debug logging artifacts from production code
-- [ ] Rotate API keys exposed during setup (Anthropic, OpenAI, Qdrant, Telegram bot token)
 - [ ] Set `TRIGGER_SECRET` env var on VPS for /trigger endpoint access
 
 ## Next Steps
 
-1. Rotate exposed API keys
-2. Set `TRIGGER_SECRET` on VPS
-3. Add Tash's Telegram ID for partner access
+1. Set `TRIGGER_SECRET` on VPS
+2. Add Tash's Telegram ID for partner access
 4. Phase 3: Notion integration (bidirectional sync)
 
 ## Open Decisions
