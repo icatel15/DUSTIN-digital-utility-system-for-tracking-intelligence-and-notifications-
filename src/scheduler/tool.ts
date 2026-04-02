@@ -31,9 +31,11 @@ SCHEDULE TYPES:
 - "cron": Cron expression with timezone. { kind: "cron", expr: "0 9 * * 1-5", tz: "America/Los_Angeles" }
 
 DELIVERY:
-- { channel: "slack", target: "owner" } - DM the configured owner (default)
+- { channel: "slack", target: "owner" } - DM the configured Slack owner (default)
 - { channel: "slack", target: "U04ABC123" } - DM a specific Slack user
 - { channel: "slack", target: "C04ABC123" } - Post to a Slack channel
+- { channel: "telegram", target: "owner" } - Send to configured Telegram owner chat
+- { channel: "telegram", target: "123456789" } - Send to a specific Telegram chat ID
 - { channel: "none" } - Silent (no delivery, useful for maintenance tasks)
 
 When creating a task, write the task prompt as a complete, self-contained instruction.

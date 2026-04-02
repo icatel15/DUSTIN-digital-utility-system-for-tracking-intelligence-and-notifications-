@@ -27,6 +27,17 @@ function createMockSlackChannel() {
 	};
 }
 
+function createMockTelegramChannel() {
+	return {
+		send: mock(async (_conversationId: string, _message: { text: string }) => ({
+			id: "mock-msg-id",
+			channelId: "telegram",
+			conversationId: _conversationId,
+			timestamp: new Date(),
+		})),
+	};
+}
+
 describe("Scheduler", () => {
 	let db: ReturnType<typeof createMockSupabase>;
 	let mockRuntime: ReturnType<typeof createMockRuntime>;
@@ -306,6 +317,100 @@ describe("Scheduler", () => {
 		await scheduler.runJobNow(job.id);
 
 		expect(mockSlack.sendDm).toHaveBeenCalledWith("U_LATE_OWNER", "Mock response from agent");
+	});
+
+	test("createJob with telegram delivery", async () => {
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
+
+		const job = await scheduler.createJob({
+			name: "Telegram Post",
+			schedule: { kind: "every", intervalMs: 60_000 },
+			task: "Post to Telegram",
+			delivery: { channel: "telegram", target: "8669996556" },
+		});
+
+		expect(job.delivery).toEqual({ channel: "telegram", target: "8669996556" });
+	});
+
+	test("runJobNow delivers result to Telegram owner", async () => {
+		const mockTelegram = createMockTelegramChannel();
+		const scheduler = new Scheduler({
+			db: db as any,
+			runtime: mockRuntime as never,
+			telegramChannel: mockTelegram as never,
+			ownerTelegramChatId: "8669996556",
+		});
+
+		const job = await scheduler.createJob({
+			name: "TG Owner Delivery",
+			schedule: { kind: "every", intervalMs: 60_000 },
+			task: "Deliver to TG owner",
+			delivery: { channel: "telegram", target: "owner" },
+		});
+		await scheduler.runJobNow(job.id);
+
+		expect(mockTelegram.send).toHaveBeenCalledWith("telegram:8669996556", {
+			text: "Mock response from agent",
+		});
+	});
+
+	test("runJobNow delivers to specific Telegram chat ID", async () => {
+		const mockTelegram = createMockTelegramChannel();
+		const scheduler = new Scheduler({
+			db: db as any,
+			runtime: mockRuntime as never,
+			telegramChannel: mockTelegram as never,
+			ownerTelegramChatId: "8669996556",
+		});
+
+		const job = await scheduler.createJob({
+			name: "TG Direct Delivery",
+			schedule: { kind: "every", intervalMs: 60_000 },
+			task: "Deliver to specific TG chat",
+			delivery: { channel: "telegram", target: "123456789" },
+		});
+		await scheduler.runJobNow(job.id);
+
+		expect(mockTelegram.send).toHaveBeenCalledWith("telegram:123456789", {
+			text: "Mock response from agent",
+		});
+	});
+
+	test("runJobNow with telegram delivery but no channel configured skips silently", async () => {
+		const scheduler = new Scheduler({
+			db: db as any,
+			runtime: mockRuntime as never,
+		});
+
+		const job = await scheduler.createJob({
+			name: "TG No Channel",
+			schedule: { kind: "every", intervalMs: 60_000 },
+			task: "Should not fail",
+			delivery: { channel: "telegram", target: "owner" },
+		});
+
+		// Should not throw
+		const result = await scheduler.runJobNow(job.id);
+		expect(result).toBe("Mock response from agent");
+	});
+
+	test("setTelegramChannel updates delivery target", async () => {
+		const scheduler = new Scheduler({ db: db as any, runtime: mockRuntime as never });
+		const mockTelegram = createMockTelegramChannel();
+
+		scheduler.setTelegramChannel(mockTelegram as never, "8669996556");
+
+		const job = await scheduler.createJob({
+			name: "Late TG",
+			schedule: { kind: "every", intervalMs: 60_000 },
+			task: "Late telegram delivery",
+			delivery: { channel: "telegram", target: "owner" },
+		});
+		await scheduler.runJobNow(job.id);
+
+		expect(mockTelegram.send).toHaveBeenCalledWith("telegram:8669996556", {
+			text: "Mock response from agent",
+		});
 	});
 
 	test("at schedule job is marked completed after run", async () => {

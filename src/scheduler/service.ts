@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AgentRuntime } from "../agent/runtime.ts";
 import type { SlackChannel } from "../channels/slack.ts";
+import type { TelegramChannel } from "../channels/telegram.ts";
 import type { SupabaseClient } from "../db/connection.ts";
 import { computeBackoffNextRun, computeNextRunAt, parseScheduleValue, serializeScheduleValue } from "./schedule.ts";
 import type { JobCreateInput, JobRow, ScheduledJob } from "./types.ts";
@@ -13,7 +14,9 @@ type SchedulerDeps = {
 	db: SupabaseClient;
 	runtime: AgentRuntime;
 	slackChannel?: SlackChannel;
+	telegramChannel?: TelegramChannel;
 	ownerUserId?: string;
+	ownerTelegramChatId?: string;
 	deliveryAllowlist?: Set<string>;
 };
 
@@ -21,7 +24,9 @@ export class Scheduler {
 	private db: SupabaseClient;
 	private runtime: AgentRuntime;
 	private slackChannel: SlackChannel | undefined;
+	private telegramChannel: TelegramChannel | undefined;
 	private ownerUserId: string | undefined;
+	private ownerTelegramChatId: string | undefined;
 	private deliveryAllowlist: Set<string> | undefined;
 	private timer: ReturnType<typeof setTimeout> | null = null;
 	private running = false;
@@ -31,7 +36,9 @@ export class Scheduler {
 		this.db = deps.db;
 		this.runtime = deps.runtime;
 		this.slackChannel = deps.slackChannel;
+		this.telegramChannel = deps.telegramChannel;
 		this.ownerUserId = deps.ownerUserId;
+		this.ownerTelegramChatId = deps.ownerTelegramChatId;
 		this.deliveryAllowlist = deps.deliveryAllowlist;
 	}
 
@@ -39,6 +46,12 @@ export class Scheduler {
 	setSlackChannel(channel: SlackChannel, ownerUserId?: string): void {
 		this.slackChannel = channel;
 		if (ownerUserId) this.ownerUserId = ownerUserId;
+	}
+
+	/** Set Telegram channel after construction (for lazy wiring when channels init after scheduler) */
+	setTelegramChannel(channel: TelegramChannel, ownerChatId?: string): void {
+		this.telegramChannel = channel;
+		if (ownerChatId) this.ownerTelegramChatId = ownerChatId;
 	}
 
 	async start(): Promise<void> {
@@ -301,6 +314,20 @@ export class Scheduler {
 				await this.slackChannel.sendDm(target, text);
 			}
 		}
+
+		if (job.delivery.channel === "telegram" && this.telegramChannel) {
+			const target = job.delivery.target;
+			const chatId =
+				target === "owner" && this.ownerTelegramChatId ? this.ownerTelegramChatId : target;
+
+			const conversationId = `telegram:${chatId}`;
+			try {
+				await this.telegramChannel.send(conversationId, { text });
+			} catch (err: unknown) {
+				const msg = err instanceof Error ? err.message : String(err);
+				console.error(`[scheduler] Telegram delivery failed for job ${job.id}: ${msg}`);
+			}
+		}
 	}
 
 	private notifyOwner(text: string): void {
@@ -308,6 +335,12 @@ export class Scheduler {
 			this.slackChannel.sendDm(this.ownerUserId, text).catch((err: unknown) => {
 				const msg = err instanceof Error ? err.message : String(err);
 				console.error(`[scheduler] Failed to notify owner: ${msg}`);
+			});
+		} else if (this.telegramChannel && this.ownerTelegramChatId) {
+			const conversationId = `telegram:${this.ownerTelegramChatId}`;
+			this.telegramChannel.send(conversationId, { text }).catch((err: unknown) => {
+				const msg = err instanceof Error ? err.message : String(err);
+				console.error(`[scheduler] Failed to notify owner via Telegram: ${msg}`);
 			});
 		}
 	}
@@ -354,7 +387,7 @@ function rowToJob(row: JobRow): ScheduledJob {
 		schedule,
 		task: row.task,
 		delivery: {
-			channel: row.delivery_channel as "slack" | "none",
+			channel: row.delivery_channel as "slack" | "telegram" | "none",
 			target: row.delivery_target,
 		},
 		status: row.status as ScheduledJob["status"],

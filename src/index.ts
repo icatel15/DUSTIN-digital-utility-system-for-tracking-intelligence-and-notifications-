@@ -33,6 +33,7 @@ import {
 import { closeDatabase, getDatabase } from "./db/connection.ts";
 import { runMigrations } from "./db/migrate.ts";
 import { createEmailToolServer } from "./email/tool.ts";
+import { createWebSearchToolServer } from "./websearch/tool.ts";
 import { EvolutionEngine } from "./evolution/engine.ts";
 import type { SessionSummary } from "./evolution/types.ts";
 import { AuditLogger } from "./mcp/audit.ts";
@@ -210,10 +211,19 @@ async function main(): Promise<void> {
 							}),
 					}
 				: {}),
+			...(process.env.TAVILY_API_KEY
+				? {
+						"phantom-web-search": () =>
+							createWebSearchToolServer({
+								dailyLimit: Number(process.env.TAVILY_DAILY_LIMIT) || 50,
+							}),
+					}
+				: {}),
 		});
 		const emailStatus = process.env.RESEND_API_KEY ? " + email" : "";
+		const searchStatus = process.env.TAVILY_API_KEY ? " + web-search" : "";
 		console.log(
-			`[mcp] MCP server initialized (dynamic tools + scheduler + web UI + secrets${emailStatus} wired to agent)`,
+			`[mcp] MCP server initialized (dynamic tools + scheduler + web UI + secrets${emailStatus}${searchStatus} wired to agent)`,
 		);
 	} catch (err: unknown) {
 		const msg = err instanceof Error ? err.message : String(err);
@@ -658,6 +668,14 @@ async function main(): Promise<void> {
 	// Wire Slack into scheduler and /trigger now that channels are connected
 	if (scheduler && slackChannel && channelsConfig?.slack?.owner_user_id) {
 		scheduler.setSlackChannel(slackChannel, channelsConfig.slack.owner_user_id);
+	}
+	if (scheduler && telegramChannel) {
+		const ownerTgChatId = channelsConfig?.telegram?.owner_user_id ?? process.env.OWNER_TELEGRAM_USER_ID;
+		if (ownerTgChatId) {
+			scheduler.setTelegramChannel(telegramChannel, ownerTgChatId);
+		} else {
+			scheduler.setTelegramChannel(telegramChannel);
+		}
 	}
 	if (scheduler) {
 		await scheduler.start();

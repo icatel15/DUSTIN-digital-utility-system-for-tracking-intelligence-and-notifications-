@@ -33,6 +33,8 @@ services:
       - dustin_data:/app/data
       - dustin_public:/app/public
       - dustin_repos:/app/repos
+      # Claude Code memory — persists agent SDK memory across container restarts
+      - dustin_claude:/home/phantom/.claude
       # Docker socket for sibling container creation
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
@@ -56,6 +58,7 @@ volumes:
   dustin_data:
   dustin_public:
   dustin_repos:
+  dustin_claude:
 
 networks:
   dustin-net:
